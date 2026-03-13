@@ -1,0 +1,19 @@
+{
+  "name": "cursor-edamame-package",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Portable Cursor MCP bridge and behavioral-model refresh package for EDAMAME Security",
+  "bin": {
+    "cursor-edamame-mcp": "./bridge/cursor_edamame_mcp.mjs",
+    "cursor-edamame-extrapolator": "./service/cursor_extrapolator.mjs",
+    "cursor-edamame-verdict-reader": "./service/verdict_reader.mjs"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build:bundle": "bash setup/build_bundle.sh",
+    "test:live:posture": "bash tests_live/run_cursor_live_posture.sh",
+    "test:live:app": "bash tests_live/run_cursor_live_app.sh",
+    "test:live:auth": "bash tests_live/run_cursor_live_auth_failures.sh"
+  }
+}

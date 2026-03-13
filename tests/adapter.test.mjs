@@ -1,0 +1,578 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { buildRawSessionIngestPayload, collectTranscriptSessions } from "../adapters/session_prediction_adapter.mjs";
+
+async function makeTempFixture() {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cursor-edamame-"));
+  const workspaceRoot = path.join(root, "openclaw_security");
+  const siblingRepo = path.join(root, "edamame_core");
+  const cursorProjectsRoot = path.join(root, "cursor-projects");
+  const transcriptDir = path.join(cursorProjectsRoot, "fixture-workspace", "agent-transcripts");
+
+  await fs.mkdir(path.join(workspaceRoot, "tests"), { recursive: true });
+  await fs.mkdir(siblingRepo, { recursive: true });
+  await fs.mkdir(transcriptDir, { recursive: true });
+
+  const transcriptPath = path.join(transcriptDir, "session-one.txt");
+  await fs.writeFile(
+    transcriptPath,
+    `user:
+<user_query>
+update the divergence engine tests and run cargo test
+</user_query>
+
+assistant:
+[Tool call] ReadFile
+  path: ${workspaceRoot}/tests/test_divergence_engine.sh
+[Tool call] Shell
+  command: cargo test -p openclaw_security
+[Tool call] Shell
+  command: python3 scripts/report.py --port 3000
+[Tool call] WebSearch
+  query: cargo flaky test
+assistant:
+I will only touch \`${workspaceRoot}/tests/test_divergence_engine.sh\` and \`${workspaceRoot}/src/lib.rs\`.
+Do not access ~/.ssh/id_rsa or any sibling repositories.
+`,
+    "utf8",
+  );
+
+  return { root, workspaceRoot, siblingRepo, cursorProjectsRoot, transcriptDir };
+}
+
+test("collectTranscriptSessions parses txt transcript tool calls", async () => {
+  const fixture = await makeTempFixture();
+  const sessions = await collectTranscriptSessions({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 4,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: ["api.openai.com:443"],
+  });
+
+  assert.equal(sessions.length, 1);
+  assert.deepEqual(
+    sessions[0].toolNames.sort(),
+    ["ReadFile", "Shell", "WebSearch"].sort(),
+  );
+  assert.equal(sessions[0].commands.length, 2);
+});
+
+test("buildRawSessionIngestPayload forwards transcript context with derived session hints", async () => {
+  const fixture = await makeTempFixture();
+  const result = await buildRawSessionIngestPayload({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 4,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: ["api.openai.com:443"],
+    scopeParentPaths: ["*/Cursor Helper*", "*/cursor_edamame_mcp.mjs"],
+  });
+
+  assert.equal(result.rawSessions.agent_type, "cursor");
+  assert.equal(result.rawSessions.agent_instance_id, "cursor-test-fixture");
+  assert.equal(result.rawSessions.source_kind, "cursor");
+  assert.equal(result.rawSessions.sessions.length, 1);
+  const rawSession = result.rawSessions.sessions[0];
+
+  assert.equal(rawSession.session_key, "session-one");
+  assert.equal(rawSession.title, "update the divergence engine tests and run cargo test");
+  assert.deepEqual(rawSession.tool_names.sort(), ["ReadFile", "Shell", "WebSearch"].sort());
+  assert.ok(rawSession.commands.some((entry) => entry.includes("cargo test -p openclaw_security")));
+  assert.ok(rawSession.commands.some((entry) => entry.includes("python3 scripts/report.py --port 3000")));
+  assert.ok(rawSession.user_text.includes("update the divergence engine tests"));
+  assert.ok(rawSession.assistant_text.includes("Do not access ~/.ssh/id_rsa"));
+  assert.deepEqual(rawSession.derived_expected_process_paths, ["*/cargo", "*/python*"]);
+  assert.deepEqual(rawSession.derived_expected_parent_paths, [path.join(fixture.workspaceRoot, "scripts/report.py")]);
+  assert.deepEqual(rawSession.derived_scope_parent_paths, ["*/Cursor Helper*", "*/cursor_edamame_mcp.mjs"]);
+  assert.deepEqual(rawSession.derived_expected_local_open_ports, [3000]);
+  assert.ok(rawSession.derived_expected_traffic.includes("api.openai.com:443"));
+  assert.ok(rawSession.derived_expected_traffic.includes("crates.io:443"));
+  assert.ok(rawSession.derived_expected_traffic.includes("static.crates.io:443"));
+  assert.ok(rawSession.derived_expected_traffic.includes("github.com:443"));
+  assert.ok(rawSession.derived_expected_open_files.includes(path.join(fixture.workspaceRoot, "src/lib.rs")));
+  assert.ok(
+    rawSession.derived_expected_open_files.includes(path.join(fixture.workspaceRoot, "tests/test_divergence_engine.sh")),
+  );
+  assert.ok(rawSession.derived_expected_open_files.includes(path.join(fixture.workspaceRoot, "scripts/report.py")));
+  assert.ok(!rawSession.derived_expected_open_files.includes("~/.ssh/id_rsa"));
+  assert.ok(rawSession.raw_text.includes("[Tool call] Shell"));
+  assert.ok(rawSession.source_path.endsWith("session-one.txt"));
+  assert.ok(result.rawPayloadHash.length > 10);
+});
+
+test("collectTranscriptSessions uses the freshest transcript artifact per session", async () => {
+  const fixture = await makeTempFixture();
+  const txtPath = path.join(fixture.transcriptDir, "session-fresh.txt");
+  const jsonlPath = path.join(fixture.transcriptDir, "session-fresh.jsonl");
+  const now = new Date();
+  const oneMinuteAgo = new Date(now.getTime() - 60_000);
+
+  await fs.writeFile(
+    txtPath,
+    `user:
+<user_query>
+older txt session content
+</user_query>
+`,
+    "utf8",
+  );
+  await fs.writeFile(
+    jsonlPath,
+    `${JSON.stringify({
+      role: "user",
+      message: { content: [{ type: "text", text: "newer jsonl session content" }] },
+    })}\n`,
+    "utf8",
+  );
+  await fs.utimes(txtPath, oneMinuteAgo, oneMinuteAgo);
+  await fs.utimes(jsonlPath, now, now);
+
+  const sessions = await collectTranscriptSessions({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 10,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: ["api.openai.com:443"],
+  });
+
+  const freshSession = sessions.find((session) => session.sessionId === "session-fresh");
+  assert.ok(freshSession);
+  assert.equal(freshSession.sourcePath, jsonlPath);
+  assert.equal(freshSession.sourceFormat, "jsonl");
+  assert.ok(freshSession.userText.includes("newer jsonl session content"));
+});
+
+test("collectTranscriptSessions excludes sessions inactive beyond the active window", async () => {
+  const fixture = await makeTempFixture();
+  const stalePath = path.join(fixture.transcriptDir, "session-stale.txt");
+  const recentPath = path.join(fixture.transcriptDir, "session-recent.txt");
+  const now = new Date();
+  const tenMinutesAgo = new Date(now.getTime() - 10 * 60_000);
+
+  await fs.writeFile(
+    stalePath,
+    `user:
+<user_query>
+stale session
+</user_query>
+`,
+    "utf8",
+  );
+  await fs.writeFile(
+    recentPath,
+    `user:
+<user_query>
+recent session
+</user_query>
+`,
+    "utf8",
+  );
+  await fs.utimes(stalePath, tenMinutesAgo, tenMinutesAgo);
+  await fs.utimes(recentPath, now, now);
+
+  const sessions = await collectTranscriptSessions({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 10,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: ["api.openai.com:443"],
+  });
+
+  assert.ok(sessions.some((session) => session.sessionId === "session-recent"));
+  assert.ok(!sessions.some((session) => session.sessionId === "session-stale"));
+});
+
+test("collectTranscriptSessions extracts tools and commands from JSONL assistant reasoning text", async () => {
+  const fixture = await makeTempFixture();
+  const jsonlDir = path.join(fixture.transcriptDir, "jsonl-session");
+  await fs.mkdir(jsonlDir, { recursive: true });
+  const jsonlPath = path.join(jsonlDir, "jsonl-session.jsonl");
+
+  const assistantReasoning = [
+    "I need to read the divergence engine config. Let me use the Read tool to look at the file.",
+    "Now I'll run cargo build --features standalone,swiftrs to verify it compiles.",
+    "The Shell command showed compilation errors. Let me fix them with StrReplace.",
+    "I'll also run flutter analyze to check for lint issues.",
+    "Let me use Grep to search for the function definition across the codebase.",
+    "I need to check git status to see what files have changed.",
+  ].join("\n\n");
+
+  const lines = [
+    JSON.stringify({
+      role: "user",
+      message: { content: [{ type: "text", text: "fix the divergence engine and run cargo build" }] },
+    }),
+    JSON.stringify({
+      role: "assistant",
+      message: { content: [{ type: "text", text: assistantReasoning }] },
+    }),
+  ].join("\n");
+
+  await fs.writeFile(jsonlPath, lines, "utf8");
+
+  const sessions = await collectTranscriptSessions({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 10,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: [],
+  });
+
+  const session = sessions.find((s) => s.sessionId === "jsonl-session");
+  assert.ok(session, "JSONL session should be found");
+  assert.equal(session.sourceFormat, "jsonl");
+
+  assert.ok(session.toolNames.includes("Read"), `toolNames should include Read, got: ${session.toolNames}`);
+  assert.ok(session.toolNames.includes("Shell"), `toolNames should include Shell, got: ${session.toolNames}`);
+  assert.ok(session.toolNames.includes("StrReplace"), `toolNames should include StrReplace, got: ${session.toolNames}`);
+  assert.ok(session.toolNames.includes("Grep"), `toolNames should include Grep, got: ${session.toolNames}`);
+
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("cargo build")),
+    `commands should include cargo build, got: ${JSON.stringify(session.commands)}`,
+  );
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("flutter analyze")),
+    `commands should include flutter analyze, got: ${JSON.stringify(session.commands)}`,
+  );
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("git status")),
+    `commands should include git status, got: ${JSON.stringify(session.commands)}`,
+  );
+});
+
+test("buildRawSessionIngestPayload populates derived hints from JSONL prose extraction", async () => {
+  const fixture = await makeTempFixture();
+  const jsonlDir = path.join(fixture.transcriptDir, "jsonl-derive");
+  await fs.mkdir(jsonlDir, { recursive: true });
+  const jsonlPath = path.join(jsonlDir, "jsonl-derive.jsonl");
+
+  const assistantText = [
+    "I need to run cargo test --features standalone to verify the changes.",
+    "Let me also run npm install in the frontend directory.",
+    `The file ${fixture.workspaceRoot}/src/divergence.rs needs a StrReplace fix.`,
+    "I'll use the Shell tool to execute the build.",
+    "The service runs on localhost:8080 for the MCP endpoint.",
+  ].join("\n\n");
+
+  const lines = [
+    JSON.stringify({
+      role: "user",
+      message: { content: [{ type: "text", text: "build and test the divergence module" }] },
+    }),
+    JSON.stringify({
+      role: "assistant",
+      message: { content: [{ type: "text", text: assistantText }] },
+    }),
+  ].join("\n");
+
+  await fs.writeFile(jsonlPath, lines, "utf8");
+
+  const result = await buildRawSessionIngestPayload({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 10,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: [],
+    scopeParentPaths: [],
+  });
+
+  const session = result.rawSessions.sessions.find((s) => s.session_key === "jsonl-derive");
+  assert.ok(session, "JSONL derive session should be found");
+
+  assert.ok(session.tool_names.includes("Shell"), `tool_names should have Shell: ${session.tool_names}`);
+  assert.ok(session.tool_names.includes("StrReplace"), `tool_names should have StrReplace: ${session.tool_names}`);
+
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("cargo test")),
+    `commands should have cargo test: ${JSON.stringify(session.commands)}`,
+  );
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("npm install")),
+    `commands should have npm install: ${JSON.stringify(session.commands)}`,
+  );
+
+  assert.ok(
+    session.derived_expected_process_paths.includes("*/cargo"),
+    `process paths should have */cargo: ${session.derived_expected_process_paths}`,
+  );
+  assert.ok(
+    session.derived_expected_process_paths.includes("*/node"),
+    `process paths should have */node: ${session.derived_expected_process_paths}`,
+  );
+
+  assert.ok(
+    session.derived_expected_traffic.includes("crates.io:443"),
+    `traffic should have crates.io: ${session.derived_expected_traffic}`,
+  );
+  assert.ok(
+    session.derived_expected_traffic.includes("registry.npmjs.org:443"),
+    `traffic should have npm registry: ${session.derived_expected_traffic}`,
+  );
+
+  assert.ok(
+    session.derived_expected_local_open_ports.includes(8080),
+    `ports should have 8080: ${session.derived_expected_local_open_ports}`,
+  );
+});
+
+test("JSONL nmap session extracts commands, traffic targets, ports, and process paths", async () => {
+  const fixture = await makeTempFixture();
+  const jsonlDir = path.join(fixture.transcriptDir, "nmap-session");
+  await fs.mkdir(jsonlDir, { recursive: true });
+  const jsonlPath = path.join(jsonlDir, "nmap-session.jsonl");
+
+  const assistantText = [
+    "I'll run a port scan against `www.edamame.tech` using `nmap`.",
+    "",
+    "Here are the results:",
+    "**Host:** `www.edamame.tech` (35.71.142.77)",
+    "- Also resolves to: 52.223.52.2",
+    "- rDNS: `a0b1d980e1f2226c6.awsglobalaccelerator.com` (AWS Global Accelerator)",
+    "",
+    "**Open Ports (2 of 1000 scanned):**",
+    "",
+    "| Port | State | Service |",
+    "|------|-------|---------|",
+    "| 80/tcp | open | HTTP |",
+    "| 443/tcp | open | HTTPS |",
+    "",
+    "**998 ports** are filtered (no response), which is expected behind AWS Global Accelerator.",
+  ].join("\n");
+
+  const lines = [
+    JSON.stringify({
+      role: "user",
+      message: { content: [{ type: "text", text: "port scan www.edamame.tech" }] },
+    }),
+    JSON.stringify({
+      role: "assistant",
+      message: { content: [{ type: "text", text: assistantText }] },
+    }),
+  ].join("\n");
+
+  await fs.writeFile(jsonlPath, lines, "utf8");
+
+  const result = await buildRawSessionIngestPayload({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 10,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: [],
+    scopeParentPaths: [],
+  });
+
+  const session = result.rawSessions.sessions.find((s) => s.session_key === "nmap-session");
+  assert.ok(session, "nmap session should be found");
+
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("nmap")),
+    `commands should include nmap: ${JSON.stringify(session.commands)}`,
+  );
+
+  assert.ok(
+    session.derived_expected_process_paths.includes("*/nmap"),
+    `process paths should have */nmap: ${session.derived_expected_process_paths}`,
+  );
+
+  assert.ok(
+    session.derived_expected_traffic.some((t) => t.includes("www.edamame.tech")),
+    `traffic should include www.edamame.tech: ${session.derived_expected_traffic}`,
+  );
+
+  assert.ok(
+    session.derived_expected_traffic.some((t) => t.includes("awsglobalaccelerator.com")),
+    `traffic should include rDNS host: ${session.derived_expected_traffic}`,
+  );
+
+  assert.ok(
+    session.derived_expected_local_open_ports.includes(80),
+    `ports should include 80: ${session.derived_expected_local_open_ports}`,
+  );
+  assert.ok(
+    session.derived_expected_local_open_ports.includes(443),
+    `ports should include 443: ${session.derived_expected_local_open_ports}`,
+  );
+});
+
+test("JSONL session with ssh, ping, and dig extracts all commands and traffic", async () => {
+  const fixture = await makeTempFixture();
+  const jsonlDir = path.join(fixture.transcriptDir, "network-session");
+  await fs.mkdir(jsonlDir, { recursive: true });
+  const jsonlPath = path.join(jsonlDir, "network-session.jsonl");
+
+  const assistantText = [
+    "I'll check connectivity to the server first.",
+    "Running ping api.example.com to verify it's reachable.",
+    "Now let me run dig api.example.com to check DNS resolution.",
+    "The server is up. Let me ssh deploy@api.example.com to check the logs.",
+    "I'll also use curl https://api.example.com/health to check the API endpoint.",
+  ].join("\n\n");
+
+  const lines = [
+    JSON.stringify({
+      role: "user",
+      message: { content: [{ type: "text", text: "check server health and deploy" }] },
+    }),
+    JSON.stringify({
+      role: "assistant",
+      message: { content: [{ type: "text", text: assistantText }] },
+    }),
+  ].join("\n");
+
+  await fs.writeFile(jsonlPath, lines, "utf8");
+
+  const result = await buildRawSessionIngestPayload({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 10,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: [],
+    scopeParentPaths: [],
+  });
+
+  const session = result.rawSessions.sessions.find((s) => s.session_key === "network-session");
+  assert.ok(session, "network session should be found");
+
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("ping")),
+    `commands should include ping: ${JSON.stringify(session.commands)}`,
+  );
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("dig")),
+    `commands should include dig: ${JSON.stringify(session.commands)}`,
+  );
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("ssh")),
+    `commands should include ssh: ${JSON.stringify(session.commands)}`,
+  );
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("curl")),
+    `commands should include curl: ${JSON.stringify(session.commands)}`,
+  );
+
+  assert.ok(
+    session.derived_expected_process_paths.includes("*/ping"),
+    `process paths should have */ping: ${session.derived_expected_process_paths}`,
+  );
+  assert.ok(
+    session.derived_expected_process_paths.includes("*/dig"),
+    `process paths should have */dig: ${session.derived_expected_process_paths}`,
+  );
+  assert.ok(
+    session.derived_expected_process_paths.includes("*/ssh"),
+    `process paths should have */ssh: ${session.derived_expected_process_paths}`,
+  );
+  assert.ok(
+    session.derived_expected_process_paths.includes("*/curl"),
+    `process paths should have */curl: ${session.derived_expected_process_paths}`,
+  );
+
+  assert.ok(
+    session.derived_expected_traffic.some((t) => t.includes("api.example.com")),
+    `traffic should include api.example.com: ${session.derived_expected_traffic}`,
+  );
+});
+
+test("TXT transcript with nmap extracts structured tool calls and port results", async () => {
+  const fixture = await makeTempFixture();
+  const txtPath = path.join(fixture.transcriptDir, "nmap-txt.txt");
+
+  await fs.writeFile(
+    txtPath,
+    `user:
+<user_query>
+port scan www.edamame.tech
+</user_query>
+
+A:
+[Tool call] Shell
+  command: nmap -p 1-1000 www.edamame.tech
+assistant:
+Here are the results:
+Host: www.edamame.tech (35.71.142.77)
+80/tcp open HTTP
+443/tcp open HTTPS
+998 ports filtered
+`,
+    "utf8",
+  );
+
+  const result = await buildRawSessionIngestPayload({
+    workspaceRoot: fixture.workspaceRoot,
+    cursorProjectsRoot: fixture.cursorProjectsRoot,
+    transcriptProjectHints: ["fixture-workspace"],
+    transcriptLimit: 10,
+    transcriptRecencyHours: 48,
+    transcriptActiveWindowMinutes: 5,
+    agentType: "cursor",
+    agentInstanceId: "cursor-test-fixture",
+    cursorLlmHosts: [],
+    scopeParentPaths: [],
+  });
+
+  const session = result.rawSessions.sessions.find((s) => s.session_key === "nmap-txt");
+  assert.ok(session, "nmap txt session should be found");
+
+  assert.ok(session.tool_names.includes("Shell"), `tool_names should have Shell: ${session.tool_names}`);
+
+  assert.ok(
+    session.commands.some((cmd) => cmd.includes("nmap")),
+    `commands should include nmap: ${JSON.stringify(session.commands)}`,
+  );
+
+  assert.ok(
+    session.derived_expected_process_paths.includes("*/nmap"),
+    `process paths should have */nmap: ${session.derived_expected_process_paths}`,
+  );
+
+  assert.ok(
+    session.derived_expected_traffic.some((t) => t.includes("www.edamame.tech")),
+    `traffic should include scan target: ${session.derived_expected_traffic}`,
+  );
+
+  assert.ok(
+    session.derived_expected_local_open_ports.includes(80),
+    `ports should include 80: ${session.derived_expected_local_open_ports}`,
+  );
+  assert.ok(
+    session.derived_expected_local_open_ports.includes(443),
+    `ports should include 443: ${session.derived_expected_local_open_ports}`,
+  );
+});

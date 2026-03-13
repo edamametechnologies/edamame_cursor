@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cursor-edamame": {
+      "type": "stdio",
+      "command": "__PACKAGE_ROOT__/bridge/cursor_edamame_mcp.mjs",
+      "args": [
+        "--config",
+        "__CONFIG_PATH__"
+      ]
+    }
+  }
+}
