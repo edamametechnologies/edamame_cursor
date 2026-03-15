@@ -102,7 +102,7 @@ esac
 
 async function makeBridgeFixture(options = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "cursor-edamame-bridge-"));
-  const workspaceRoot = path.join(root, "openclaw_security");
+  const workspaceRoot = path.join(root, "edamame_project");
   const cursorProjectsRoot = path.join(root, "cursor-projects");
   const transcriptDir = path.join(cursorProjectsRoot, "fixture-workspace", "agent-transcripts");
   const configPath = path.join(root, "config.json");
@@ -1223,4 +1223,62 @@ test("runLatestExtrapolation returns structured failure after repeated parse fai
   assert.equal(savedStates.length, 1);
   assert.equal(savedStates[0].lastAttemptCount, 3);
   assert.equal(savedStates[0].lastRetryCount, 2);
+});
+
+test("runLatestExtrapolation pushes heartbeat window when no sessions and no cached window", async () => {
+  const config = await makeBridgeFixture();
+  const invocations = [];
+  const savedStates = [];
+  let upsertedWindowJson = null;
+
+  const result = await runLatestExtrapolation(config, {
+    buildPayload: async () => ({
+      sessions: [],
+      rawSessions: {
+        agent_type: "cursor",
+        agent_instance_id: "cursor-bridge-test",
+        source_kind: "cursor",
+        sessions: [],
+      },
+      rawPayloadHash: "payload-empty",
+    }),
+    loadState: async () => ({}),
+    saveState: async (_cfg, _name, value) => {
+      savedStates.push(value);
+    },
+    makeClient: async () => ({
+      invoke: async (toolName, params) => {
+        invocations.push(toolName);
+        if (toolName === "upsert_behavioral_model") {
+          upsertedWindowJson = params.window_json;
+          return { ok: true };
+        }
+        throw new Error(`unexpected_tool:${toolName}`);
+      },
+    }),
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.upserted, true);
+  assert.deepEqual(result.reasons, ["heartbeat"]);
+  assert.equal(result.sessionCount, 0);
+  assert.deepEqual(invocations, ["upsert_behavioral_model"]);
+
+  const heartbeat = JSON.parse(upsertedWindowJson);
+  assert.equal(heartbeat.agent_type, "cursor");
+  assert.equal(heartbeat.agent_instance_id, "cursor-bridge-test");
+  assert.equal(heartbeat.predictions.length, 1);
+  assert.match(heartbeat.predictions[0].action, /cron tick.*no new reasoning/i);
+  assert.match(heartbeat.predictions[0].session_key, /heartbeat/);
+  assert.deepEqual(heartbeat.predictions[0].expected_l7_protocols, ["https"]);
+  assert.ok(Array.isArray(heartbeat.predictions[0].scope_process_paths));
+  assert.ok(Array.isArray(heartbeat.predictions[0].scope_parent_paths));
+  assert.ok(Array.isArray(heartbeat.predictions[0].scope_grandparent_paths));
+  assert.ok(Array.isArray(heartbeat.predictions[0].scope_any_lineage_paths));
+  assert.ok(Array.isArray(heartbeat.predictions[0].expected_grandparent_paths));
+  assert.ok(Array.isArray(heartbeat.predictions[0].not_expected_grandparent_paths));
+
+  assert.equal(savedStates.length, 1);
+  assert.deepEqual(savedStates[0].lastReasons, ["heartbeat"]);
+  assert.equal(savedStates[0].lastGeneratedWindow.agent_type, "cursor");
 });

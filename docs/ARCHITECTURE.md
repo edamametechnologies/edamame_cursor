@@ -40,6 +40,42 @@ EDAMAME supports two additive reasoning-plane producer contracts:
 - The package never stores security verdict state in workspace files.
 - Multi-agent merge ownership lives in EDAMAME Security. Cursor never tries to compute the merged model locally.
 
+## Scope Filters (Cross-Platform)
+
+The Cursor package uses `scope_parent_paths` to tell the EDAMAME divergence engine which sessions belong to Cursor. A session is in scope when its parent process matches any of these patterns:
+
+| Platform | Filter pattern | Matches |
+|---|---|---|
+| macOS | `*/Cursor.app/Contents/MacOS/Cursor` | Main Cursor binary |
+| macOS | `*/Cursor Helper*` | Renderer, Plugin, GPU helper processes |
+| Windows | `*/Cursor/Cursor.exe` | Main binary under `AppData\Local\Programs\Cursor\` |
+| Windows | `*/Cursor/Cursor Helper*.exe` | All helper variants (.exe) |
+| Linux AppImage | `/tmp/.mount_cursor*` | FUSE-mounted AppImage processes |
+| Linux installed | `*/cursor/cursor`, `/opt/cursor*` | Extracted or system-installed binary |
+| All | `*/cursor_edamame_mcp.mjs` | MCP bridge script spawned by this package |
+
+These defaults are defined in `service/config.mjs` under `scopeParentPaths` and can be overridden in the user config file. Additional scope levels (`scopeProcessPaths`, `scopeGrandparentPaths`, `scopeAnyLineagePaths`) are available but empty by default for Cursor.
+
+## Infrastructure Traffic Patterns
+
+The `cursorLlmHosts` config key lists entries that Cursor is expected to
+connect to. These are injected both as LLM hints (via `derived_expected_traffic`
+in the raw-session payload) and directly into heartbeat windows.
+
+Two matching modes are supported:
+- **Domain-suffix matching** (`host:port`): `amazonaws.com:443` matches any `*.amazonaws.com:443` destination.
+- **ASN-based matching** (`asn:OWNER`): `asn:CLOUDFLARENET` matches any destination IP whose ASN owner contains "cloudflarenet" (case-insensitive substring). This is preferred for CDN providers whose IPs don't map to predictable domain suffixes.
+
+| Entry | Covers |
+|---|---|
+| `cursor.sh:443` | Cursor API endpoints (`api2.cursor.sh`, etc.) |
+| `api.openai.com:443` | OpenAI API calls |
+| `api.anthropic.com:443` | Anthropic/Claude API calls |
+| `amazonaws.com:443` | AWS EC2 backend hosts used by Cursor |
+| `asn:CLOUDFLARENET` | Cloudflare CDN, analytics, edge workers (AS13335) |
+
+These can be extended via the `cursorLlmHosts` key in the user config file.
+
 ## Why The App Path Works
 
 - The app already hosts the same MCP and RPC divergence surface as `edamame_posture`.

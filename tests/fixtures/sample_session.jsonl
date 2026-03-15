@@ -1,3 +1,3 @@
 {"role":"user","message":{"content":[{"type":"text","text":"<user_query>\ninspect the app-hosted divergence wrappers in edamame_app/lib/core/core_agentic.dart\n</user_query>"}]}}
 {"role":"assistant","message":{"content":[{"type":"text","text":"I’m going to inspect `edamame_app/lib/core/core_agentic.dart` and `edamame_app/lib/core/api_agentic.dart`, then update the wrappers if needed."}]}}
-{"role":"assistant","message":{"content":[{"type":"text","text":"This task should stay within `/Users/flyonnet/Programming/edamame_app` and should not touch `~/.ssh/*` or unrelated repos."}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"This task should stay within `/tmp/edamame_project` and should not touch `~/.ssh/*` or unrelated repos."}]}}

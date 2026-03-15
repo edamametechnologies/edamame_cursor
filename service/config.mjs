@@ -92,7 +92,19 @@ export const DEFAULT_CONFIG = Object.freeze({
     process.env.EDAMAME_MCP_PSK_FILE || path.join(defaultStateDir(), "edamame-mcp.psk"),
   divergenceIntervalSecs: 120,
   verdictHistoryLimit: 10,
-  cursorLlmHosts: ["*.cursor.sh:443", "api.openai.com:443", "api.anthropic.com:443"],
+  cursorLlmHosts: [
+    "cursor.sh:443",
+    "api.openai.com:443",
+    "api.anthropic.com:443",
+    "amazonaws.com:443",
+    "asn:CLOUDFLARENET",
+    // Notion's AS33191 IPs are now served via Cloudflare; the ASN owner
+    // string in ip2asn still reads "NOTION" so we need a separate entry.
+    "asn:NOTION",
+    // Cursor uses Azure-hosted LLM endpoints (AS8075).
+    "asn:MICROSOFT-CORP",
+  ],
+  scopeProcessPaths: [],
   scopeParentPaths: [
     // macOS: main binary and all helper variants (Plugin, Renderer, GPU)
     "*/Cursor.app/Contents/MacOS/Cursor",
@@ -108,6 +120,8 @@ export const DEFAULT_CONFIG = Object.freeze({
     // MCP bridge script spawned by the Cursor package
     "*/cursor_edamame_mcp.mjs",
   ],
+  scopeGrandparentPaths: [],
+  scopeAnyLineagePaths: [],
   debugBridgeLog: false,
   debugBridgeLogFile: path.join(defaultStateDir(), "bridge-debug.log"),
 });
@@ -181,8 +195,17 @@ function toPositiveIntOrDefault(value, fallback) {
 
 function normalizeConfig(raw = {}, overrides = {}) {
   const merged = { ...raw, ...overrides };
+  const configuredScopeProcessPaths = toArray(
+    firstDefined(merged, "scopeProcessPaths", "scope_process_paths"),
+  );
   const configuredScopeParentPaths = toArray(
     firstDefined(merged, "scopeParentPaths", "scope_parent_paths"),
+  );
+  const configuredScopeGrandparentPaths = toArray(
+    firstDefined(merged, "scopeGrandparentPaths", "scope_grandparent_paths"),
+  );
+  const configuredScopeAnyLineagePaths = toArray(
+    firstDefined(merged, "scopeAnyLineagePaths", "scope_any_lineage_paths"),
   );
   const workspaceRoot = path.resolve(
     expandHome(firstDefined(merged, "workspaceRoot", "workspace_root")) || DEFAULT_CONFIG.workspaceRoot,
@@ -256,8 +279,17 @@ function normalizeConfig(raw = {}, overrides = {}) {
     cursorLlmHosts: uniqueStrings(
       toArray(firstDefined(merged, "cursorLlmHosts", "cursor_llm_hosts")).concat(DEFAULT_CONFIG.cursorLlmHosts),
     ),
+    scopeProcessPaths: uniqueStrings(
+      configuredScopeProcessPaths.length > 0 ? configuredScopeProcessPaths : DEFAULT_CONFIG.scopeProcessPaths,
+    ),
     scopeParentPaths: uniqueStrings(
       configuredScopeParentPaths.length > 0 ? configuredScopeParentPaths : DEFAULT_CONFIG.scopeParentPaths,
+    ),
+    scopeGrandparentPaths: uniqueStrings(
+      configuredScopeGrandparentPaths.length > 0 ? configuredScopeGrandparentPaths : DEFAULT_CONFIG.scopeGrandparentPaths,
+    ),
+    scopeAnyLineagePaths: uniqueStrings(
+      configuredScopeAnyLineagePaths.length > 0 ? configuredScopeAnyLineagePaths : DEFAULT_CONFIG.scopeAnyLineagePaths,
     ),
     debugBridgeLog: toBoolean(
       firstDefined(merged, "debugBridgeLog", "debug_bridge_log"),

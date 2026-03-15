@@ -7,7 +7,7 @@ import { buildRawSessionIngestPayload, collectTranscriptSessions } from "../adap
 
 async function makeTempFixture() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "cursor-edamame-"));
-  const workspaceRoot = path.join(root, "openclaw_security");
+  const workspaceRoot = path.join(root, "edamame_project");
   const siblingRepo = path.join(root, "edamame_core");
   const cursorProjectsRoot = path.join(root, "cursor-projects");
   const transcriptDir = path.join(cursorProjectsRoot, "fixture-workspace", "agent-transcripts");
@@ -26,15 +26,15 @@ update the divergence engine tests and run cargo test
 
 assistant:
 [Tool call] ReadFile
-  path: ${workspaceRoot}/tests/test_divergence_engine.sh
+  path: ${workspaceRoot}/tests/example_test.sh
 [Tool call] Shell
-  command: cargo test -p openclaw_security
+  command: cargo test -p edamame_core
 [Tool call] Shell
   command: python3 scripts/report.py --port 3000
 [Tool call] WebSearch
   query: cargo flaky test
 assistant:
-I will only touch \`${workspaceRoot}/tests/test_divergence_engine.sh\` and \`${workspaceRoot}/src/lib.rs\`.
+I will only touch \`${workspaceRoot}/tests/example_test.sh\` and \`${workspaceRoot}/src/lib.rs\`.
 Do not access ~/.ssh/id_rsa or any sibling repositories.
 `,
     "utf8",
@@ -89,7 +89,7 @@ test("buildRawSessionIngestPayload forwards transcript context with derived sess
   assert.equal(rawSession.session_key, "session-one");
   assert.equal(rawSession.title, "update the divergence engine tests and run cargo test");
   assert.deepEqual(rawSession.tool_names.sort(), ["ReadFile", "Shell", "WebSearch"].sort());
-  assert.ok(rawSession.commands.some((entry) => entry.includes("cargo test -p openclaw_security")));
+  assert.ok(rawSession.commands.some((entry) => entry.includes("cargo test -p edamame_core")));
   assert.ok(rawSession.commands.some((entry) => entry.includes("python3 scripts/report.py --port 3000")));
   assert.ok(rawSession.user_text.includes("update the divergence engine tests"));
   assert.ok(rawSession.assistant_text.includes("Do not access ~/.ssh/id_rsa"));
@@ -103,7 +103,7 @@ test("buildRawSessionIngestPayload forwards transcript context with derived sess
   assert.ok(rawSession.derived_expected_traffic.includes("github.com:443"));
   assert.ok(rawSession.derived_expected_open_files.includes(path.join(fixture.workspaceRoot, "src/lib.rs")));
   assert.ok(
-    rawSession.derived_expected_open_files.includes(path.join(fixture.workspaceRoot, "tests/test_divergence_engine.sh")),
+    rawSession.derived_expected_open_files.includes(path.join(fixture.workspaceRoot, "tests/example_test.sh")),
   );
   assert.ok(rawSession.derived_expected_open_files.includes(path.join(fixture.workspaceRoot, "scripts/report.py")));
   assert.ok(!rawSession.derived_expected_open_files.includes("~/.ssh/id_rsa"));

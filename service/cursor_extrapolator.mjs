@@ -254,9 +254,99 @@ export async function runLatestExtrapolation(config, options = {}) {
   };
 
   if (sessions.length === 0 && !cachedGeneratedWindow) {
-    result.success = false;
-    result.reasons = ["no_sessions"];
-    return result;
+    if (options.dryRun) {
+      result.reasons = ["heartbeat_dry_run"];
+      return result;
+    }
+
+    let client = null;
+    try {
+      client = await makeClient(config);
+    } catch (error) {
+      const failure = classifyExtrapolationFailure(error);
+      if (!failure) throw error;
+      result.success = false;
+      result.error = failure.message;
+      result.reasons = [failure.reason];
+      return result;
+    }
+
+    const now = new Date();
+    const windowMinutes = config.transcriptActiveWindowMinutes || 5;
+    const heartbeatWindow = {
+      window_start: new Date(now.getTime() - windowMinutes * 60_000).toISOString(),
+      window_end: now.toISOString(),
+      agent_type: rawSessions.agent_type,
+      agent_instance_id: rawSessions.agent_instance_id,
+      predictions: [
+        {
+          agent_type: rawSessions.agent_type,
+          agent_instance_id: rawSessions.agent_instance_id,
+          session_key: `agent:${rawSessions.agent_instance_id}:cron:heartbeat`,
+          action:
+            "Periodic Cursor extrapolator cron tick with no new reasoning activity to model.",
+          tools_called: [],
+          scope_process_paths: config.scopeProcessPaths || [],
+          scope_parent_paths: config.scopeParentPaths || [],
+          scope_grandparent_paths: config.scopeGrandparentPaths || [],
+          scope_any_lineage_paths: config.scopeAnyLineagePaths || [],
+          expected_traffic: [...(config.cursorLlmHosts || [])],
+          expected_sensitive_files: [],
+          expected_lan_devices: [],
+          expected_local_open_ports: [],
+          expected_process_paths: [],
+          expected_parent_paths: config.scopeParentPaths || [],
+          expected_grandparent_paths: config.scopeGrandparentPaths || [],
+          expected_open_files: [],
+          expected_l7_protocols: ["https"],
+          expected_system_config: [],
+          not_expected_traffic: [],
+          not_expected_sensitive_files: [],
+          not_expected_lan_devices: [],
+          not_expected_local_open_ports: [],
+          not_expected_process_paths: [],
+          not_expected_parent_paths: [],
+          not_expected_grandparent_paths: [],
+          not_expected_open_files: [],
+          not_expected_l7_protocols: [],
+          not_expected_system_config: [],
+        },
+      ],
+      contributors: [],
+      version: "3.0",
+      hash: "",
+      ingested_at: now.toISOString(),
+    };
+
+    try {
+      await client.invoke("upsert_behavioral_model", {
+        window_json: JSON.stringify(heartbeatWindow),
+      });
+      result.upserted = true;
+      result.reasons = ["heartbeat"];
+      result.generatedWindow = heartbeatWindow;
+
+      await saveStateFn(config, "cursor-extrapolator", {
+        lastRunAt: now.toISOString(),
+        lastPayloadHash: null,
+        lastWindowHash: null,
+        lastSessionIds: [],
+        lastReasons: result.reasons,
+        lastError: null,
+        lastAttemptCount: 1,
+        lastRetryCount: 0,
+        lastGeneratedWindow: heartbeatWindow,
+      });
+
+      return result;
+    } catch (error) {
+      const failure = classifyExtrapolationFailure(error);
+      if (!failure) throw error;
+      result.success = false;
+      result.error = failure.message;
+      result.reasons = ["heartbeat_failed", failure.reason];
+      return result;
+    }
   }
 
   if (sessions.length === 0 && previousPayloadHash) {

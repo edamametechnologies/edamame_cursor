@@ -16,7 +16,6 @@ app preference files or other host internals.
 ## Install From Source
 
 ```bash
-cd cursor_package
 bash setup/install.sh /absolute/path/to/target/workspace
 ```
 
@@ -191,7 +190,6 @@ is not already running on the same machine.
 4. Run the live suite against that same-machine endpoint:
 
 ```bash
-cd cursor_package
 node tests_live/run_cursor_live_suite.mjs --host-kind edamame_posture --config /absolute/path/to/config.json --json
 ```
 

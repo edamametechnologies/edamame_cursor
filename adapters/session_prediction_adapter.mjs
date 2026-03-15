@@ -856,7 +856,10 @@ export async function buildRawSessionIngestPayload(config, options = {}) {
   const sessions = await collectTranscriptSessions(config, options);
   const agentType = config.agentType || "cursor";
   const agentInstanceId = config.agentInstanceId || "cursor-default";
+  const derivedScopeProcessPaths = uniqueStrings(config.scopeProcessPaths || []);
   const derivedScopeParentPaths = uniqueStrings(config.scopeParentPaths || []);
+  const derivedScopeGrandparentPaths = uniqueStrings(config.scopeGrandparentPaths || []);
+  const derivedScopeAnyLineagePaths = uniqueStrings(config.scopeAnyLineagePaths || []);
   const now = new Date();
   const windowStart = sessions.reduce(
     (earliest, session) => (session.startedAt < earliest ? session.startedAt : earliest),
@@ -888,11 +891,15 @@ export async function buildRawSessionIngestPayload(config, options = {}) {
         raw_text: session.rawText,
         tool_names: uniqueStrings(session.toolNames),
         commands: uniqueStrings(session.commands),
-        derived_expected_traffic: derivedExpectedTraffic,
+        derived_expected_traffic: uniqueStrings([...derivedExpectedTraffic, ...(config.cursorLlmHosts || [])]),
         derived_expected_local_open_ports: derivedExpectedLocalOpenPorts,
         derived_expected_process_paths: processPaths,
         derived_expected_parent_paths: parentPaths,
+        derived_expected_grandparent_paths: [],
+        derived_scope_process_paths: derivedScopeProcessPaths,
         derived_scope_parent_paths: derivedScopeParentPaths,
+        derived_scope_grandparent_paths: derivedScopeGrandparentPaths,
+        derived_scope_any_lineage_paths: derivedScopeAnyLineagePaths,
         derived_expected_open_files: derivedExpectedOpenFiles,
         source_path: session.sourcePath,
         started_at: session.startedAt.toISOString(),
