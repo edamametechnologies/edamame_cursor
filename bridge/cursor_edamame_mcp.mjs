@@ -232,7 +232,17 @@ const TOOL_DEFINITIONS = [
   {
     name: "edamame.get_score",
     description: "Read the current EDAMAME workstation score summary.",
-    inputSchema: { type: "object", additionalProperties: false, properties: {} },
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        full: {
+          type: "boolean",
+          description:
+            "Return full threat details including descriptions and remediation (default: false, trimmed).",
+        },
+      },
+    },
   },
   {
     name: "edamame.get_sessions",
