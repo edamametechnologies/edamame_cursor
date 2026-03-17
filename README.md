@@ -48,26 +48,9 @@ bash setup/install.sh /path/to/your/workspace
 ```
 
 2. **Register the MCP server in Cursor.** The installer renders a
-   `cursor-mcp.json` snippet. Merge it into your Cursor MCP settings
-   (`~/.cursor/mcp.json` or workspace `.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "edamame": {
-      "command": "node",
-      "args": [
-        "<install-root>/bridge/cursor_edamame_mcp.mjs",
-        "--config",
-        "<config-path>/config.json"
-      ]
-    }
-  }
-}
-```
-
-Replace `<install-root>` and `<config-path>` with the paths printed by the
-installer.
+   `cursor-mcp.json` snippet with fully resolved paths. Merge it into your
+   Cursor MCP settings (`~/.cursor/mcp.json` or workspace `.cursor/mcp.json`).
+   The snippet path is printed at the end of the install.
 
 3. **Restart Cursor**, then run `edamame_cursor_control_center` to pair
    with your local EDAMAME host.

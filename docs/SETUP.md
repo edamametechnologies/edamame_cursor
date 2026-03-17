@@ -81,13 +81,11 @@ Key fields:
 
 ## Cursor MCP Registration
 
-Use the rendered `cursor-mcp.json` snippet from the install output and merge it into your Cursor MCP configuration so Cursor launches:
+The installer renders a `cursor-mcp.json` snippet with fully resolved paths.
+Merge it into your Cursor MCP configuration (`~/.cursor/mcp.json` or workspace
+`.cursor/mcp.json`). The snippet location is printed at the end of the install.
 
-```text
-<package-root>/bridge/cursor_edamame_mcp.mjs --config <config-path>
-```
-
-That bridge process is the portable runtime entrypoint for both:
+The bridge process is the portable runtime entrypoint for both:
 
 - on-demand tools such as `cursor.refresh_behavioral_model`
 - automatic periodic behavioral-model refresh while Cursor is open
