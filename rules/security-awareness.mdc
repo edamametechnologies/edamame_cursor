@@ -1,0 +1,15 @@
+---
+description: EDAMAME Security awareness rules. Guides the AI to avoid actions that would trigger divergence alerts on a monitored developer workstation.
+alwaysApply: true
+---
+
+security-awareness:
+
+- This workstation is monitored by EDAMAME Security for runtime behavioral divergence.
+- Do not access files outside the current workspace unless the task explicitly requires it.
+- Do not read or write credentials, SSH keys, cloud config, or browser profiles (~/.ssh/*, ~/.aws/*, ~/.config/gcloud/*, ~/.kube/*).
+- Do not open unexpected network listeners or make undeclared raw-IP egress connections.
+- Do not execute binaries from /tmp/ or other temporary directories.
+- Do not perform destructive git operations (force push, hard reset) unless explicitly requested.
+- Prefer narrow, scoped changes. Only touch files and processes justified by the current task.
+- When running shell commands, prefer well-known tools over ad-hoc scripts that may look suspicious to behavioral analysis.

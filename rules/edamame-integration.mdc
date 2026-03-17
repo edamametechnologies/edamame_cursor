@@ -1,0 +1,13 @@
+---
+description: Rules for working with EDAMAME Security MCP tools and divergence monitoring. Apply when interacting with EDAMAME endpoints or security assessment.
+alwaysApply: false
+---
+
+edamame-integration:
+
+- The EDAMAME MCP server exposes tools for security posture, divergence verdicts, network sessions, and behavioral model management.
+- Use `edamame_cursor_control_center` to check pairing status, endpoint health, and divergence engine state.
+- Use `edamame_cursor_control_center_refresh_now` to force an immediate behavioral model export from recent transcripts.
+- Security verdicts (CLEAN, DIVERGENCE, NO_MODEL, STALE) are authoritative from EDAMAME only. Never store or cache verdict state in workspace files.
+- The behavioral model is a contributor slice tagged with agent_type=cursor. EDAMAME merges it with other active contributors.
+- When debugging divergence alerts, check the EDAMAME Security app Divergence tab for the merged model, verdict history, and safety-floor findings.

@@ -190,7 +190,7 @@ class McpHttpClient {
         protocolVersion: this.desiredProtocolVersion,
         capabilities: {},
         clientInfo: {
-          name: "cursor-edamame-package",
+          name: "edamame",
           version: "0.1.0",
         },
       },

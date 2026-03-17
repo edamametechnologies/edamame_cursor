@@ -8,12 +8,28 @@
   - Linux production default: `edamame_posture`
   - macOS opt-in live automation: a locally built `edamame_posture` binary
     started on the host itself, not the Lima VM daemon
-- Cursor MCP registration pointing at `bridge/cursor_edamame_mcp.mjs`.
 
 The supported pairing flow is explicit. The package no longer reads PSKs from
 app preference files or other host internals.
 
-## Install From Source
+## Install via Cursor Marketplace Plugin
+
+The recommended install path. Search for **EDAMAME Security** in the Cursor
+Marketplace panel and click **Install**. The plugin registers:
+
+- the MCP server (stdio bridge to EDAMAME),
+- persistent security-awareness rules,
+- skills for posture assessment and divergence diagnosis,
+- a security-monitor agent,
+- healthcheck and export-intent commands.
+
+After installation, run `edamame_cursor_control_center` from Cursor to pair
+with your local EDAMAME host. The plugin uses the `.mcp.json` at the repo
+root. Set the `EDAMAME_CURSOR_CONFIG` environment variable to point at your
+rendered config file, or run `setup/install.sh` once to generate it and then
+point the env var at the generated path.
+
+## Install From Source (Traditional)
 
 ```bash
 bash setup/install.sh /absolute/path/to/target/workspace
@@ -45,7 +61,7 @@ Default state directory:
 - Windows: `%LOCALAPPDATA%\\cursor-edamame\\state`
 - Linux: `~/.local/state/cursor-edamame`
 
-The default local PSK file now lives inside the package state directory as
+The default local credential file now lives inside the package state directory as
 `edamame-mcp.psk`.
 
 Key fields:
@@ -61,7 +77,7 @@ Key fields:
 - `posture_daemon_wrapper_path` - Linux path expected for the packaged daemon wrapper. Default: `/usr/bin/edamame_posture_daemon.sh`.
 - `posture_config_path` - Linux path expected for the packaged daemon config. Default: `/etc/edamame_posture.conf`.
 - `edamame_mcp_endpoint` - local EDAMAME MCP endpoint, default `http://127.0.0.1:3000/mcp`.
-- `edamame_mcp_psk_file` - package-local file where the pasted PSK is stored.
+- `edamame_mcp_psk_file` - package-local file where the credential (PSK or per-client token) is stored.
 
 ## Cursor MCP Registration
 
@@ -87,7 +103,7 @@ internal LLM provider to generate and store the contributor `BehavioralWindow`.
 After Cursor sees the MCP snippet, run `edamame_cursor_control_center` from Cursor. The
 control center shows:
 
-- the configured endpoint and local PSK file,
+- the configured endpoint and local credential file,
 - the last intent export time and trigger,
 - the current EDAMAME status when the MCP endpoint is reachable,
 - Linux-only local host controller status for `edamame_posture`,
@@ -106,8 +122,8 @@ Use `host_kind = edamame_app`.
 
 1. Start the EDAMAME Security app.
 2. Enable its local MCP server on port `3000`.
-3. Generate a fresh PSK from the app's MCP controls.
-4. Paste that PSK into `edamame_cursor_control_center` and save pairing.
+3. **Primary flow**: Click "Request pairing from app" in the control center, approve in the EDAMAME Security app. The credential is stored automatically.
+4. **Fallback**: Generate a PSK from the app's MCP controls, paste it into `edamame_cursor_control_center` and save pairing.
 5. Refresh status until the MCP endpoint, divergence engine, and behavioral model checks go healthy.
 
 ### Linux
@@ -202,7 +218,7 @@ bash setup/healthcheck.sh --strict --json
 This validates:
 
 - local config presence,
-- PSK file presence,
+- credential file presence,
 - Linux `edamame_posture` service readiness when the Debian `systemd` path is applicable,
 - EDAMAME MCP reachability,
 - divergence-engine running state,

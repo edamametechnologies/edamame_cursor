@@ -71,6 +71,15 @@ cp -R "$SOURCE_ROOT/setup" "$INSTALL_ROOT/"
 cp "$SOURCE_ROOT/package.json" "$INSTALL_ROOT/"
 cp "$SOURCE_ROOT/README.md" "$INSTALL_ROOT/"
 
+# Cursor plugin artifacts (for reference; plugin install uses the repo directly)
+cp -R "$SOURCE_ROOT/.cursor-plugin" "$INSTALL_ROOT/"
+cp "$SOURCE_ROOT/.mcp.json" "$INSTALL_ROOT/"
+cp -R "$SOURCE_ROOT/rules" "$INSTALL_ROOT/"
+cp -R "$SOURCE_ROOT/skills" "$INSTALL_ROOT/"
+cp -R "$SOURCE_ROOT/agents" "$INSTALL_ROOT/"
+cp -R "$SOURCE_ROOT/commands" "$INSTALL_ROOT/"
+cp -R "$SOURCE_ROOT/assets" "$INSTALL_ROOT/"
+
 chmod +x "$INSTALL_ROOT/bridge/"*.mjs
 chmod +x "$INSTALL_ROOT/service/"*.mjs
 chmod +x "$INSTALL_ROOT/setup/"*.sh
@@ -163,6 +172,7 @@ Rendered scheduler templates:
 Next steps:
 1. Copy the MCP snippet into your Cursor MCP configuration.
 2. Launch Cursor and run the edamame_cursor_control_center tool.
-3. Generate a fresh PSK from EDAMAME Security or use the Linux edamame_posture auto-pair action in the control center.
+3. macOS/Windows: click 'Request pairing from app' in the control center, or paste a PSK manually.
+   Linux: use the auto-pair action or paste a PSK generated with edamame_posture mcp-generate-psk.
 4. Run: "$INSTALL_ROOT/setup/healthcheck.sh" --strict --json
 EOF

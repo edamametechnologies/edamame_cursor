@@ -7,6 +7,34 @@ Keep the OpenClaw split intact on a developer workstation:
 - Cursor is the reasoning plane and only proposes intent.
 - EDAMAME Security remains the system-plane authority for telemetry, behavioral-model storage, divergence-engine execution, and verdict history.
 
+## Distribution Modes
+
+This package supports two distribution paths:
+
+- **Cursor Marketplace Plugin**: installed from the Marketplace, automatic discovery of MCP server, rules, skills, agents, and commands via `.cursor-plugin/plugin.json`.
+- **Traditional MCP install**: manual `setup/install.sh` copies the package to a stable per-user directory and renders config templates. The user wires the MCP snippet into Cursor manually.
+
+Both paths use the same runtime code. The plugin structure (`.cursor-plugin/`, `.mcp.json`, `rules/`, `skills/`, `agents/`, `commands/`) provides Cursor-native discovery; the traditional path provides the same MCP bridge plus rendered scheduler templates for operators.
+
+## Plugin Structure
+
+```text
+.cursor-plugin/plugin.json  -- Cursor plugin manifest
+.mcp.json                   -- MCP server definition (auto-discovered by Cursor)
+rules/                      -- Persistent AI guidance (.mdc files)
+  security-awareness.mdc    -- Safety-floor rules for monitored workstations
+  edamame-integration.mdc   -- EDAMAME MCP tool usage patterns
+skills/                     -- Agent skills
+  security-posture/         -- Posture assessment skill
+  divergence-monitor/       -- Divergence diagnosis skill
+agents/                     -- Custom agent configurations
+  security-monitor.md       -- Security-aware coding agent
+commands/                   -- Agent-executable commands
+  healthcheck.md            -- Run EDAMAME health check
+  export-intent.md          -- Force behavioral model refresh
+assets/                     -- Logo and static assets
+```
+
 ## Producer Modes
 
 EDAMAME supports two additive reasoning-plane producer contracts:
@@ -19,7 +47,7 @@ EDAMAME supports two additive reasoning-plane producer contracts:
 | OpenClaw concept | Cursor package component | Responsibility |
 |---|---|---|
 | MCP bridge | `bridge/cursor_edamame_mcp.mjs` | Present a local stdio MCP server to Cursor, serve the control-center MCP App resource, and forward approved calls to the app-hosted EDAMAME MCP endpoint. |
-| Pairing and status UI | `bridge/control_center_app.html` + `service/control_center.mjs` | Collect explicit PSK/endpoint pairing input, persist it locally, and show runtime status without reading secrets from host app internals. |
+| Pairing and status UI | `bridge/control_center_app.html` + `service/control_center.mjs` | Support two pairing modes: app-mediated pairing (macOS/Windows via POST /mcp/pair) and PSK paste (Linux/CLI). Persist credentials locally and show runtime status without reading secrets from host app internals. |
 | Extrapolator skill | `service/cursor_extrapolator.mjs` + `adapters/session_prediction_adapter.mjs` | Read Cursor transcripts, assemble a `RawReasoningSessionPayload`, and forward it to EDAMAME raw-session ingest. |
 | Posture facade | `service/posture_facade.mjs` + `service/verdict_reader.mjs` | Read divergence verdicts, history, score, suspicious sessions, and todos without owning verdict state. |
 | Portable refresh loop | `bridge/cursor_edamame_mcp.mjs` | Keep a lightweight periodic extrapolator loop alive while Cursor keeps the MCP bridge connected. |
@@ -81,4 +109,4 @@ These can be extended via the `cursorLlmHosts` key in the user config file.
 - The app already hosts the same MCP and RPC divergence surface as `edamame_posture`.
 - The package treats app availability as an operational dependency and validates it through `service/health.mjs`.
 - Raw-session repush is built into the extrapolator so app restarts do not require model persistence in the package itself.
-- Pairing is explicit: the control center stores the PSK in the package state directory instead of scraping secrets from app preferences.
+- Pairing is explicit: the control center stores the credential in the package state directory. On macOS/Windows, app-mediated pairing (POST /mcp/pair) obtains a per-client token; on Linux/CLI, a shared PSK is pasted. The credential file holds either type.

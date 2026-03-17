@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "edamame": {
+      "command": "node",
+      "args": [
+        "./bridge/cursor_edamame_mcp.mjs"
+      ]
+    }
+  }
+}

@@ -480,6 +480,7 @@
       const PAIRING_TOOL = "edamame_cursor_control_center_apply_pairing";
       const HOST_ACTION_TOOL = "edamame_cursor_control_center_run_host_action";
       const REFRESH_NOW_TOOL = "edamame_cursor_control_center_refresh_now";
+      const APP_PAIRING_TOOL = "edamame_cursor_control_center_request_app_pairing";
 
       const appState = {
         payload: null,
@@ -559,6 +560,8 @@
             return "Exporting intent to EDAMAME";
           case "pairing":
             return "Saving local pairing";
+          case "app-pairing":
+            return "Requesting pairing from app (approve in EDAMAME)";
           case "host-generate_and_start":
             return "Generating PSK and starting local host";
           case "host-start":
@@ -688,6 +691,31 @@
         }
       }
 
+      async function requestAppPairing() {
+        appState.busy = "app-pairing";
+        appState.error = null;
+        render();
+        try {
+          const payload = await callServerTool(APP_PAIRING_TOOL, {
+            endpoint: appState.draft.endpoint,
+          });
+          setPayload(payload);
+        } catch (error) {
+          const message = String(error?.message || error);
+          if (message.includes("pairing_rejected")) {
+            appState.error = "Pairing request was rejected in the app.";
+          } else if (message.includes("pairing_timeout") || message.includes("pairing_expired")) {
+            appState.error = "Pairing request timed out. Try again and approve in the app within 60 seconds.";
+          } else {
+            appState.error = message;
+          }
+          render();
+        } finally {
+          appState.busy = null;
+          render();
+        }
+      }
+
       async function runHostAction(action) {
         appState.busy = `host-${action}`;
         appState.error = null;
@@ -741,6 +769,13 @@
         if (refreshNowButton) {
           refreshNowButton.addEventListener("click", () => {
             void refreshNow();
+          });
+        }
+
+        const appPairButton = document.getElementById("request-app-pairing");
+        if (appPairButton) {
+          appPairButton.addEventListener("click", () => {
+            void requestAppPairing();
           });
         }
 
@@ -816,22 +851,25 @@
         const hostActionResult = payload.hostActionResult || null;
         const selectedHostKind = payload.config?.hostKind || appState.draft.hostKind;
         const hostProductName = hostKindLabel(selectedHostKind);
-        const authFailed =
-          (Array.isArray(health.checks) &&
-            health.checks.some(
-              (check) =>
-                check &&
-                check.ok === false &&
-                (check.name === "mcp.authentication" ||
-                  (check.name === "mcp.endpoint" &&
-                    check.detail &&
-                    typeof check.detail === "object" &&
-                    check.detail.reason === "edamame_mcp_auth_failed")),
-            )) ||
-          (Array.isArray(extrapolator.lastReasons) &&
+        const liveAuthFailed =
+          Array.isArray(health.checks) &&
+          health.checks.some(
+            (check) =>
+              check &&
+              check.ok === false &&
+              (check.name === "mcp.authentication" ||
+                (check.name === "mcp.endpoint" &&
+                  check.detail &&
+                  typeof check.detail === "object" &&
+                  check.detail.reason === "edamame_mcp_auth_failed")),
+          );
+        const staleAuthFailed =
+          !health.ok &&
+          ((Array.isArray(extrapolator.lastReasons) &&
             extrapolator.lastReasons.includes("edamame_mcp_auth_failed")) ||
-          (Array.isArray(refreshResult?.reasons) &&
-            refreshResult.reasons.includes("edamame_mcp_auth_failed"));
+            (Array.isArray(refreshResult?.reasons) &&
+              refreshResult.reasons.includes("edamame_mcp_auth_failed")));
+        const authFailed = liveAuthFailed || staleAuthFailed;
         const heroStatusLabel = authFailed
           ? "Authentication failed"
           : health.ok
@@ -875,9 +913,11 @@
                 : hostController.running === false
                   ? "Stopped"
                   : "Unknown";
-        const pairingHelpText = pairing.actions?.autoPairSupported
-          ? "Automatic Linux pairing generates a fresh PSK, starts the local EDAMAME host, and stores the secret locally without returning it in tool results."
-          : "The PSK is stored only on this workstation and is not returned in tool results.";
+        const pairingHelpText = pairing.actions?.appPairingSupported
+          ? "App pairing sends a request to the local EDAMAME app. Approve in the app and the credential is stored automatically."
+          : pairing.actions?.autoPairSupported
+            ? "Automatic Linux pairing generates a fresh PSK, starts the local EDAMAME host, and stores the credential locally without returning it in tool results."
+            : "The credential is stored only on this workstation and is not returned in tool results.";
         const serviceManagerStatusClass =
           serviceManager.applicable !== true
             ? "status-dot"
@@ -957,7 +997,7 @@
                   Windows usually use the Security App. Linux can use the Posture CLI.
                 </p>
                 <div class="status-row">
-                  <span class="status-pill"><span class="${pairing.configured ? "status-dot ok" : "status-dot error"}"></span>${pairing.configured ? "PSK stored locally" : "PSK not stored yet"}</span>
+                  <span class="status-pill"><span class="${pairing.configured ? "status-dot ok" : "status-dot error"}"></span>${pairing.configured ? "Credential stored locally" : "Credential not stored yet"}</span>
                 </div>
                 <div class="field">
                   <label for="host-kind">Local host</label>
@@ -971,10 +1011,15 @@
                   <input id="endpoint" type="text" value="${escapeHtml(appState.draft.endpoint)}" />
                 </div>
                 <div class="field">
-                  <label for="psk">Pre-shared key (PSK)</label>
-                  <input id="psk" type="password" value="${escapeHtml(appState.draft.psk)}" placeholder="Paste the MCP PSK" />
+                  <label for="psk">MCP credential (PSK or per-client token)</label>
+                  <input id="psk" type="password" value="${escapeHtml(appState.draft.psk)}" placeholder="Paste credential or use app pairing below" />
                 </div>
                 <div class="actions">
+                  ${
+                    pairing.actions?.appPairingSupported
+                      ? `<button id="request-app-pairing" class="primary" ${appState.busy ? "disabled" : ""}>Request pairing from app</button>`
+                      : ""
+                  }
                   ${
                     pairing.actions?.autoPairSupported
                       ? `<button id="auto-pair" class="primary" ${appState.busy ? "disabled" : ""}>Generate PSK, start local host, and pair</button>`
@@ -990,7 +1035,7 @@
                       ? `<button id="stop-host" ${appState.busy ? "disabled" : ""}>Stop local host</button>`
                       : ""
                   }
-                  <button id="save-pairing" class="${pairing.actions?.autoPairSupported ? "" : "primary"}" ${appState.busy ? "disabled" : ""}>${pairing.actions?.autoPairSupported ? "Store pairing only" : "Store pairing"}</button>
+                  <button id="save-pairing" ${appState.busy ? "disabled" : ""}>${pairing.actions?.autoPairSupported || pairing.actions?.appPairingSupported ? "Store credential manually" : "Store credential"}</button>
                 </div>
                 <p class="help-text">${escapeHtml(pairingHelpText)}</p>
               </section>
@@ -1061,7 +1106,7 @@
                   <div class="metric"><span>Platform</span><strong>${escapeHtml(payload.platform || "unknown")}</strong></div>
                   <div class="metric"><span>Host product</span><strong>${escapeHtml(hostProductName)}</strong></div>
                   <div class="metric"><span>MCP endpoint</span><strong><code>${escapeHtml(payload.config?.endpoint || "unset")}</code></strong></div>
-                  <div class="metric"><span>Local PSK file</span><strong><code>${escapeHtml(payload.config?.pskFile || "unset")}</code></strong></div>
+                  <div class="metric"><span>Local credential file</span><strong><code>${escapeHtml(payload.config?.pskFile || "unset")}</code></strong></div>
                   <div class="metric"><span>Local config file</span><strong><code>${escapeHtml(payload.config?.configPath || "unset")}</code></strong></div>
                 </div>
               </section>
@@ -1205,7 +1250,7 @@
           const initResult = await sendRequest("ui/initialize", {
             protocolVersion: "2026-01-26",
             clientInfo: {
-              name: "cursor-edamame-control-center",
+              name: "edamame-control-center",
               version: "0.1.0",
             },
             appCapabilities: {

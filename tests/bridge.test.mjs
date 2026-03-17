@@ -242,7 +242,7 @@ test("handleRequest returns MCP initialize and tool list responses", async () =>
     method: "initialize",
     params: {},
   });
-  assert.equal(initializeResponse.result.serverInfo.name, "cursor-edamame-package");
+  assert.equal(initializeResponse.result.serverInfo.name, "edamame");
   assert.deepEqual(initializeResponse.result.capabilities.resources, {});
 
   const toolsResponse = await handleRequest(config, {
@@ -257,7 +257,7 @@ test("handleRequest returns MCP initialize and tool list responses", async () =>
   const controlCenterTool = toolsResponse.result.tools.find(
     (tool) => tool.name === "edamame_cursor_control_center",
   );
-  assert.equal(controlCenterTool?._meta?.ui?.resourceUri, "ui://cursor-edamame/control-center.html");
+  assert.equal(controlCenterTool?._meta?.ui?.resourceUri, "ui://edamame/control-center.html");
   assert.equal(
     toolsResponse.result.tools.some((tool) => tool.name === "edamame_cursor_control_center_apply_pairing"),
     true,
@@ -276,7 +276,7 @@ test("handleRequest serves the control-center app resource", async () => {
     id: 8,
     method: "resources/read",
     params: {
-      uri: "ui://cursor-edamame/control-center.html",
+      uri: "ui://edamame/control-center.html",
     },
   });
 

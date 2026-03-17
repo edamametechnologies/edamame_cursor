@@ -20,10 +20,25 @@ two-plane divergence detection on developer machines.
   - macOS / Windows: [EDAMAME Security app](https://edamame.tech)
   - Linux: [edamame_posture](https://github.com/edamametechnologies/edamame_posture) CLI
 
-## Quick Start
+## Installation
+
+### Option A: Cursor Marketplace Plugin (Recommended)
+
+Install from the [Cursor Marketplace](https://cursor.com/marketplace):
+
+1. Open the marketplace panel in Cursor.
+2. Search for **EDAMAME Security**.
+3. Click **Install**.
+
+The plugin automatically registers the MCP server, rules, skills, agents, and
+commands. After installation, run `edamame_cursor_control_center` from Cursor
+to pair with your local EDAMAME host.
+
+### Option B: Traditional MCP Install
+
+For manual setup or environments where the marketplace is not available:
 
 ```bash
-# Install the package for your workspace
 bash setup/install.sh /path/to/workspace
 ```
 
@@ -34,7 +49,8 @@ from Cursor to pair with EDAMAME.
 ### Pairing
 
 - **macOS / Windows**: Start the EDAMAME Security app, enable MCP on port
-  3000, generate a PSK, paste it into the control center.
+  3000. Primary: click "Request pairing from app" in the control center and
+  approve in the app. Fallback: generate a PSK and paste it into the control center.
 - **Linux**: Run `edamame_cursor_control_center` and use
   "Generate, start, and pair automatically", or manually start
   `edamame_posture mcp-start 3000 "<PSK>"` and paste the PSK.
@@ -45,10 +61,27 @@ from Cursor to pair with EDAMAME.
 bash setup/healthcheck.sh --strict --json
 ```
 
+## What the Plugin Provides
+
+| Component | Contents |
+|-----------|---------|
+| **MCP Server** | stdio bridge forwarding EDAMAME tools (posture, divergence, sessions, remediation) to Cursor |
+| **Rules** | Security-awareness guidance, EDAMAME integration patterns |
+| **Skills** | Security posture assessment, divergence monitoring and diagnosis |
+| **Agents** | Security-monitor agent for safety-aware coding |
+| **Commands** | Health check, behavioral model export |
+
 ## Layout
 
 | Directory | Purpose |
 |-----------|---------|
+| `.cursor-plugin/` | Cursor plugin manifest |
+| `.mcp.json` | Plugin MCP server definition |
+| `rules/` | Cursor rules (.mdc) for security-aware AI guidance |
+| `skills/` | Agent skills (security-posture, divergence-monitor) |
+| `agents/` | Custom agent definitions (security-monitor) |
+| `commands/` | Agent-executable commands (healthcheck, export-intent) |
+| `assets/` | Plugin logo and static assets |
 | `bridge/` | Local stdio MCP bridge, control center MCP App, forwarding surface |
 | `adapters/` | Cursor transcript parsing and `RawReasoningSessionPayload` assembly |
 | `service/` | Control center, extrapolator, posture facade, verdict reader, health checks |

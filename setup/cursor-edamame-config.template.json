@@ -18,7 +18,7 @@
   "divergence_interval_secs": 120,
   "verdict_history_limit": 10,
   "cursor_llm_hosts": [
-    "*.cursor.sh:443",
+    "cursor.sh:443",
     "api.openai.com:443",
     "api.anthropic.com:443"
   ],

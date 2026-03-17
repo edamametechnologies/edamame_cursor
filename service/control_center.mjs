@@ -13,6 +13,7 @@ import {
   ensureDirectory,
   loadConfig,
   loadState,
+  saveState,
   readJsonFile,
   writeJsonFile,
 } from "./config.mjs";
@@ -608,11 +609,12 @@ function pairingInstructions(hostKind) {
   return {
     title: "App pairing",
     summary:
-      "Generate a new PSK from the EDAMAME Security app, then paste it here so the Cursor bridge can store it locally.",
+      "Use 'Request pairing from app' for one-click setup, or paste a PSK manually as a fallback.",
     steps: [
       "Open the EDAMAME Security app and ensure its local MCP server is enabled on port 3000.",
-      "Generate a fresh MCP PSK from the app's MCP controls.",
-      "Paste the PSK into this control center and save pairing.",
+      "Click 'Request pairing from app' below -- then approve the pairing request in the EDAMAME app.",
+      "The per-client credential is stored automatically on approval.",
+      "Fallback: generate a PSK from the app's MCP controls, paste it here, and store manually.",
       "Use Refresh status or the healthcheck script to confirm the endpoint is healthy.",
     ],
     commands: [],
@@ -766,6 +768,7 @@ export async function buildControlCenterPayload(config, options = {}) {
       instructions: pairingInstructions(hostKind),
       actions: {
         manualSaveSupported: true,
+        appPairingSupported: hostKind === "edamame_app",
         autoPairSupported: hostKind === "edamame_posture" && hostController.available === true,
         startSupported: hostKind === "edamame_posture" && hostController.available === true,
         stopSupported: hostKind === "edamame_posture" && hostController.available === true,
@@ -797,6 +800,25 @@ export async function applyPairing(config, args = {}) {
   await fs.writeFile(pskFile, `${psk}\n`, { encoding: "utf8", mode: 0o600 });
   await fs.chmod(pskFile, 0o600).catch(() => {});
 
+  // Clear stale auth-failed state from the extrapolator so the control
+  // center UI doesn't flash "Authentication failed" after a successful
+  // pairing while the old state file still references the prior failure.
+  try {
+    const extState = await loadState(config, "cursor-extrapolator", {});
+    if (
+      (Array.isArray(extState.lastReasons) &&
+        extState.lastReasons.includes("edamame_mcp_auth_failed")) ||
+      (typeof extState.lastError === "string" &&
+        extState.lastError.includes("auth"))
+    ) {
+      extState.lastReasons = [];
+      extState.lastError = null;
+      await saveState(config, "cursor-extrapolator", extState);
+    }
+  } catch (_e) {
+    // Non-fatal: stale state will be overwritten on the next extrapolation cycle.
+  }
+
   const existingConfig = (await readJsonFile(configPath, {})) || {};
   const nextConfig = {
     ...baselineConfigJson(config),
@@ -817,6 +839,76 @@ export async function applyPairing(config, args = {}) {
     pskFile,
   };
   return payload;
+}
+
+const PAIRING_POLL_INTERVAL_MS = 2000;
+const PAIRING_TIMEOUT_MS = 60_000;
+
+/**
+ * Request app-mediated pairing. POSTs an unauthenticated pairing request
+ * to the EDAMAME MCP endpoint, then polls until the user approves or
+ * rejects in the EDAMAME Security app.
+ *
+ * On approval the credential is stored via `applyPairing()`.
+ */
+export async function requestAppPairing(config, args = {}) {
+  const endpoint = String(args.endpoint || config.edamameMcpEndpoint || "").trim() || "http://127.0.0.1:3000/mcp";
+  const baseUrl = endpoint.replace(/\/mcp\/?$/, "");
+  const pairUrl = `${baseUrl}/mcp/pair`;
+
+  const body = {
+    client_name: String(args.client_name || config.clientName || "Cursor EDAMAME Bridge").trim(),
+    agent_type: String(config.agentType || "cursor"),
+    agent_instance_id: String(config.agentInstanceId || "unknown"),
+    requested_endpoint: endpoint,
+    workspace_hint: config.workspaceRoot || null,
+  };
+
+  const res = await fetch(pairUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`pairing_request_failed:${res.status} ${text.slice(0, 200)}`);
+  }
+
+  const { request_id } = await res.json();
+  if (!request_id) throw new Error("pairing_request_no_id");
+
+  const deadline = Date.now() + PAIRING_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, PAIRING_POLL_INTERVAL_MS));
+
+    const statusRes = await fetch(`${pairUrl}/${request_id}`).catch(() => null);
+    if (!statusRes || !statusRes.ok) continue;
+
+    const statusBody = await statusRes.json().catch(() => null);
+    if (!statusBody) continue;
+
+    if (statusBody.status === "approved" && statusBody.credential) {
+      const payload = await applyPairing(config, {
+        host_kind: "edamame_app",
+        endpoint,
+        psk: statusBody.credential,
+      });
+      payload.pairingMethod = "app_mediated";
+      return payload;
+    }
+
+    if (statusBody.status === "rejected") {
+      throw new Error("pairing_rejected");
+    }
+
+    if (statusBody.status === "expired") {
+      throw new Error("pairing_expired");
+    }
+  }
+
+  throw new Error("pairing_timeout");
 }
 
 export async function runHostAction(config, args = {}) {

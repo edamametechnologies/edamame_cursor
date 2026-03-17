@@ -1,0 +1,24 @@
+{
+  "name": "edamame",
+  "displayName": "EDAMAME Security",
+  "version": "1.0.0",
+  "description": "Runtime behavioral monitoring for Cursor. Bridges session transcripts to the EDAMAME Security two-plane divergence engine for continuous developer workstation protection.",
+  "author": {
+    "name": "EDAMAME Technologies",
+    "email": "info@edamame.tech"
+  },
+  "homepage": "https://edamame.tech",
+  "repository": "https://github.com/edamametechnologies/edamame_cursor",
+  "license": "Apache-2.0",
+  "keywords": [
+    "security",
+    "runtime-monitoring",
+    "behavioral-analysis",
+    "divergence-detection",
+    "developer-workstation",
+    "mcp",
+    "edamame"
+  ],
+  "logo": "assets/logo.png",
+  "mcpServers": ".mcp.json"
+}

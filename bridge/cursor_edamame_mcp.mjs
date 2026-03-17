@@ -6,13 +6,13 @@ import { fileURLToPath } from "node:url";
 
 import { latestTranscriptMtimeMs } from "../adapters/session_prediction_adapter.mjs";
 import { loadConfig, loadState } from "../service/config.mjs";
-import { applyPairing, buildControlCenterPayload, runHostAction } from "../service/control_center.mjs";
+import { applyPairing, buildControlCenterPayload, requestAppPairing, runHostAction } from "../service/control_center.mjs";
 import { runLatestExtrapolation } from "../service/cursor_extrapolator.mjs";
 import { runHealthcheck } from "../service/health.mjs";
 import { readPostureSnapshot, postureSummary } from "../service/posture_facade.mjs";
 import { makeEdamameClient } from "./edamame_client.mjs";
 
-const CONTROL_CENTER_RESOURCE_URI = "ui://cursor-edamame/control-center.html";
+const CONTROL_CENTER_RESOURCE_URI = "ui://edamame/control-center.html";
 const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 const CONTROL_CENTER_APP_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -23,6 +23,7 @@ const CONTROL_CENTER_REFRESH_TOOL_NAME = "edamame_cursor_control_center_refresh"
 const CONTROL_CENTER_REFRESH_NOW_TOOL_NAME = "edamame_cursor_control_center_refresh_now";
 const CONTROL_CENTER_APPLY_PAIRING_TOOL_NAME = "edamame_cursor_control_center_apply_pairing";
 const CONTROL_CENTER_RUN_HOST_ACTION_TOOL_NAME = "edamame_cursor_control_center_run_host_action";
+const CONTROL_CENTER_REQUEST_APP_PAIRING_TOOL_NAME = "edamame_cursor_control_center_request_app_pairing";
 
 const TOOL_DEFINITIONS = [
   {
@@ -96,7 +97,7 @@ const TOOL_DEFINITIONS = [
     name: CONTROL_CENTER_APPLY_PAIRING_TOOL_NAME,
     title: "Apply Cursor EDAMAME Pairing",
     description:
-      "Store the local EDAMAME MCP endpoint and PSK for the Cursor bridge, then return an updated control-center snapshot.",
+      "Store the local EDAMAME MCP endpoint and credential (PSK or per-client token) for the Cursor bridge, then return an updated control-center snapshot.",
     annotations: {
       title: "Apply Cursor EDAMAME Pairing",
     },
@@ -123,7 +124,7 @@ const TOOL_DEFINITIONS = [
         },
         psk: {
           type: "string",
-          description: "EDAMAME MCP pre-shared key to store locally for this Cursor bridge.",
+          description: "EDAMAME MCP credential (PSK or per-client token) to store locally for this Cursor bridge.",
         },
       },
     },
@@ -165,6 +166,36 @@ const TOOL_DEFINITIONS = [
         psk: {
           type: "string",
           description: "Optional pasted PSK to use when starting a supported local host.",
+        },
+      },
+    },
+  },
+  {
+    name: CONTROL_CENTER_REQUEST_APP_PAIRING_TOOL_NAME,
+    title: "Request App-Mediated Pairing",
+    description:
+      "Request pairing from the EDAMAME Security app. Sends an unauthenticated pairing request to the local MCP endpoint; the user approves or rejects in the app. On approval the per-client credential is stored automatically.",
+    annotations: {
+      title: "Request App-Mediated Pairing",
+    },
+    _meta: {
+      ui: {
+        resourceUri: CONTROL_CENTER_RESOURCE_URI,
+        visibility: ["app"],
+      },
+      "ui/resourceUri": CONTROL_CENTER_RESOURCE_URI,
+    },
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        endpoint: {
+          type: "string",
+          description: "Local EDAMAME MCP endpoint, typically http://127.0.0.1:3000/mcp.",
+        },
+        client_name: {
+          type: "string",
+          description: "Display name shown in the app approval dialog.",
         },
       },
     },
@@ -301,6 +332,7 @@ const AUTO_REFRESH_EXEMPT_TOOLS = new Set([
   CONTROL_CENTER_REFRESH_NOW_TOOL_NAME,
   CONTROL_CENTER_APPLY_PAIRING_TOOL_NAME,
   CONTROL_CENTER_RUN_HOST_ACTION_TOOL_NAME,
+  CONTROL_CENTER_REQUEST_APP_PAIRING_TOOL_NAME,
 ]);
 
 function parseCliArgs(argv) {
@@ -323,7 +355,7 @@ function parseCliArgs(argv) {
 }
 
 function stderrLog(message) {
-  process.stderr.write(`[cursor-edamame] ${message}\n`);
+  process.stderr.write(`[edamame] ${message}\n`);
 }
 
 function previewText(value, limit = 240) {
@@ -639,6 +671,10 @@ export async function dispatchToolCall(config, toolName, args = {}) {
     return runHostAction(config, args);
   }
 
+  if (toolName === CONTROL_CENTER_REQUEST_APP_PAIRING_TOOL_NAME) {
+    return requestAppPairing(config, args);
+  }
+
   if (toolName === "cursor.refresh_behavioral_model") {
     return runLatestExtrapolation(config, { dryRun: args.dry_run === true });
   }
@@ -811,7 +847,7 @@ export async function handleRequest(config, request, runtime = {}) {
         resources: {},
       },
       serverInfo: {
-        name: "cursor-edamame-package",
+        name: "edamame",
         version: "0.1.0",
       },
     });
