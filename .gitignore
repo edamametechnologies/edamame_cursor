@@ -3,4 +3,5 @@ dist/
 .DS_Store
 *.log
 .cursor/
+__pycache__/
 # .cursor-plugin/ is intentionally tracked (Cursor plugin manifest)
