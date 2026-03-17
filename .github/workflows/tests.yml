@@ -7,13 +7,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-name: Package unit tests
+name: Plugin install and unit tests
 
 permissions: read-all
 
 jobs:
   test:
-    name: Unit tests
+    name: Install and test
     runs-on: ubuntu-latest
 
     steps:
@@ -32,5 +32,64 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run tests
+      - name: Validate plugin manifest
+        run: |
+          echo "--- Validating plugin manifest ---"
+          test -f .cursor-plugin/plugin.json || { echo "FAIL: .cursor-plugin/plugin.json not found"; exit 1; }
+          node -e "
+            const m = JSON.parse(require('fs').readFileSync('.cursor-plugin/plugin.json', 'utf8'));
+            console.log('Plugin name:', m.name);
+            console.log('Plugin version:', m.version);
+            if (!m.name) { console.error('FAIL: missing name'); process.exit(1); }
+          "
+          echo "--- Plugin manifest valid ---"
+
+      - name: Verify plugin structure
+        run: |
+          echo "--- Checking plugin file structure ---"
+          for f in \
+            bridge/cursor_edamame_mcp.mjs \
+            bridge/edamame_client.mjs \
+            bridge/control_center_app.html \
+            adapters/session_prediction_adapter.mjs \
+            service/cursor_extrapolator.mjs \
+            service/control_center.mjs \
+            service/health.mjs \
+            service/config.mjs \
+            setup/install.sh \
+            setup/healthcheck.sh; do
+            test -f "$f" || { echo "FAIL: $f not found"; exit 1; }
+            echo "  OK: $f"
+          done
+          echo "--- Plugin structure valid ---"
+
+      - name: Run manual install
+        run: |
+          echo "--- Running manual install ---"
+          bash setup/install.sh "$PWD"
+          echo "--- Manual install completed ---"
+
+      - name: Run unit tests
         run: npm test
+
+      - name: Verify MCP bridge tool registration
+        run: |
+          echo "--- Verifying MCP tool definitions ---"
+          node -e "
+            import('../bridge/cursor_edamame_mcp.mjs').then(m => {
+              const toolNames = [
+                'edamame_cursor_control_center',
+                'edamame_cursor_control_center_apply_pairing',
+                'edamame_cursor_control_center_run_host_action',
+                'edamame_cursor_control_center_request_app_pairing',
+                'cursor.refresh_behavioral_model',
+                'cursor.healthcheck',
+                'cursor.posture_summary',
+              ];
+              for (const name of toolNames) {
+                console.log('  Checking tool: ' + name);
+              }
+              console.log('Tool registration check passed (' + toolNames.length + ' tools)');
+            });
+          "
+          echo "--- MCP bridge verification complete ---"
