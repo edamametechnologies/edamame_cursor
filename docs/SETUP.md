@@ -81,9 +81,20 @@ Key fields:
 
 ## Cursor MCP Registration
 
-The installer renders a `cursor-mcp.json` snippet with fully resolved paths.
-Merge it into your Cursor MCP configuration (`~/.cursor/mcp.json` or workspace
-`.cursor/mcp.json`). The snippet location is printed at the end of the install.
+The installer renders a `cursor-mcp.json` snippet with fully resolved paths,
+including the absolute path to `node`. Merge it into your Cursor MCP
+configuration (`~/.cursor/mcp.json` or workspace `.cursor/mcp.json`). The
+snippet location is printed at the end of the install.
+
+### Troubleshooting: `env: node: No such file or directory`
+
+Cursor does not inherit your shell's `PATH`. If `node` is installed via
+Homebrew or nvm, Cursor may not find it. The manual installer resolves this
+automatically (it writes the absolute `node` path into the rendered MCP
+snippet). If you see this error after a Marketplace install, edit
+`~/.cursor/mcp.json` and replace `"command": "node"` with the full path
+(e.g. `"/opt/homebrew/bin/node"` on macOS with Homebrew,
+`"C:\\Program Files\\nodejs\\node.exe"` on Windows).
 
 The bridge process is the portable runtime entrypoint for both:
 

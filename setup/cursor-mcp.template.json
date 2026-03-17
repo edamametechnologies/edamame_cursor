@@ -2,8 +2,9 @@
   "mcpServers": {
     "edamame": {
       "type": "stdio",
-      "command": "__PACKAGE_ROOT__/bridge/cursor_edamame_mcp.mjs",
+      "command": "__NODE_BIN__",
       "args": [
+        "__PACKAGE_ROOT__/bridge/cursor_edamame_mcp.mjs",
         "--config",
         "__CONFIG_PATH__"
       ]

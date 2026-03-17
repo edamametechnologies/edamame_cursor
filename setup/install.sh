@@ -40,15 +40,24 @@ done
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$PWD}"
 
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  CONFIG_HOME="$HOME/Library/Application Support/cursor-edamame"
-  STATE_HOME="$CONFIG_HOME/state"
-  DATA_HOME="$HOME/Library/Application Support/cursor-edamame"
-else
-  CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/cursor-edamame"
-  STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/cursor-edamame"
-  DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/cursor-edamame"
-fi
+OS_KERNEL="$(uname -s)"
+case "$OS_KERNEL" in
+  Darwin)
+    CONFIG_HOME="$HOME/Library/Application Support/cursor-edamame"
+    STATE_HOME="$CONFIG_HOME/state"
+    DATA_HOME="$HOME/Library/Application Support/cursor-edamame"
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    CONFIG_HOME="${APPDATA:-$HOME/AppData/Roaming}/cursor-edamame"
+    STATE_HOME="${LOCALAPPDATA:-$HOME/AppData/Local}/cursor-edamame/state"
+    DATA_HOME="${LOCALAPPDATA:-$HOME/AppData/Local}/cursor-edamame"
+    ;;
+  *)
+    CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/cursor-edamame"
+    STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/cursor-edamame"
+    DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/cursor-edamame"
+    ;;
+esac
 
 INSTALL_ROOT="$DATA_HOME/current"
 RENDERED_DIR="$CONFIG_HOME/rendered"
@@ -80,9 +89,14 @@ cp -R "$SOURCE_ROOT/agents" "$INSTALL_ROOT/"
 cp -R "$SOURCE_ROOT/commands" "$INSTALL_ROOT/"
 cp -R "$SOURCE_ROOT/assets" "$INSTALL_ROOT/"
 
-chmod +x "$INSTALL_ROOT/bridge/"*.mjs
-chmod +x "$INSTALL_ROOT/service/"*.mjs
-chmod +x "$INSTALL_ROOT/setup/"*.sh
+case "$OS_KERNEL" in
+  MINGW*|MSYS*|CYGWIN*) ;;
+  *)
+    chmod +x "$INSTALL_ROOT/bridge/"*.mjs
+    chmod +x "$INSTALL_ROOT/service/"*.mjs
+    chmod +x "$INSTALL_ROOT/setup/"*.sh
+    ;;
+esac
 
 export INSTALL_ROOT CONFIG_PATH CURSOR_MCP_PATH WORKSPACE_ROOT STATE_HOME NODE_BIN RENDERED_DIR
 python3 - <<'PY'
@@ -103,24 +117,35 @@ default_agent_instance_id = (
     f"{socket.gethostname()}-"
     f"{hashlib.sha256(str(workspace_root).encode('utf-8')).hexdigest()[:12]}"
 )
-default_host_kind = "edamame_posture" if sys.platform.startswith("linux") else "edamame_app"
-default_posture_cli_command = "edamame_posture" if sys.platform.startswith("linux") else ""
+if sys.platform.startswith("linux"):
+    default_host_kind = "edamame_posture"
+    default_posture_cli_command = "edamame_posture"
+elif sys.platform == "win32":
+    default_host_kind = "edamame_app"
+    default_posture_cli_command = ""
+else:
+    default_host_kind = "edamame_app"
+    default_posture_cli_command = ""
 default_psk_path = state_home / "edamame-mcp.psk"
 edamame_mcp_psk_file = str(default_psk_path)
+
+def portable_path(p):
+    """Forward slashes on all platforms for JSON/config compatibility."""
+    return str(p).replace("\\", "/")
 
 def render_template(src: Path, dst: Path) -> None:
     content = src.read_text(encoding="utf-8")
     content = (
-        content.replace("__PACKAGE_ROOT__", str(install_root))
-        .replace("__CONFIG_PATH__", str(config_path))
-        .replace("__WORKSPACE_ROOT__", str(workspace_root))
+        content.replace("__PACKAGE_ROOT__", portable_path(install_root))
+        .replace("__CONFIG_PATH__", portable_path(config_path))
+        .replace("__WORKSPACE_ROOT__", portable_path(workspace_root))
         .replace("__WORKSPACE_BASENAME__", workspace_root.name)
         .replace("__DEFAULT_AGENT_INSTANCE_ID__", default_agent_instance_id)
         .replace("__DEFAULT_HOST_KIND__", default_host_kind)
-        .replace("__DEFAULT_POSTURE_CLI_COMMAND__", default_posture_cli_command)
-        .replace("__STATE_DIR__", str(state_home))
-        .replace("__EDAMAME_MCP_PSK_FILE__", edamame_mcp_psk_file)
-        .replace("__NODE_BIN__", node_bin)
+        .replace("__DEFAULT_POSTURE_CLI_COMMAND__", portable_path(default_posture_cli_command) if default_posture_cli_command else "")
+        .replace("__STATE_DIR__", portable_path(state_home))
+        .replace("__EDAMAME_MCP_PSK_FILE__", portable_path(edamame_mcp_psk_file))
+        .replace("__NODE_BIN__", portable_path(node_bin))
     )
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(content, encoding="utf-8")
@@ -136,24 +161,26 @@ render_template(
     cursor_mcp_path,
 )
 
-render_template(
-    install_root / "scheduler" / "launchd" / "com.edamame.cursor.extrapolator.plist",
-    rendered_dir / "launchd" / "com.edamame.cursor.extrapolator.plist",
-)
-render_template(
-    install_root / "scheduler" / "launchd" / "com.edamame.cursor.verdict-reader.plist",
-    rendered_dir / "launchd" / "com.edamame.cursor.verdict-reader.plist",
-)
-for name in [
-    "cursor-edamame-extrapolator.service",
-    "cursor-edamame-extrapolator.timer",
-    "cursor-edamame-verdict-reader.service",
-    "cursor-edamame-verdict-reader.timer",
-]:
+if sys.platform == "darwin":
     render_template(
-        install_root / "scheduler" / "systemd" / "user" / name,
-        rendered_dir / "systemd" / "user" / name,
+        install_root / "scheduler" / "launchd" / "com.edamame.cursor.extrapolator.plist",
+        rendered_dir / "launchd" / "com.edamame.cursor.extrapolator.plist",
     )
+    render_template(
+        install_root / "scheduler" / "launchd" / "com.edamame.cursor.verdict-reader.plist",
+        rendered_dir / "launchd" / "com.edamame.cursor.verdict-reader.plist",
+    )
+elif sys.platform.startswith("linux"):
+    for name in [
+        "cursor-edamame-extrapolator.service",
+        "cursor-edamame-extrapolator.timer",
+        "cursor-edamame-verdict-reader.service",
+        "cursor-edamame-verdict-reader.timer",
+    ]:
+        render_template(
+            install_root / "scheduler" / "systemd" / "user" / name,
+            rendered_dir / "systemd" / "user" / name,
+        )
 PY
 
 cat <<EOF

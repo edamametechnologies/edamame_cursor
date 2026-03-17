@@ -66,6 +66,15 @@ See [Setup Guide](docs/SETUP.md) for detailed config paths per platform.
   "Generate, start, and pair automatically", or manually start
   `edamame_posture mcp-start 3000 "<PSK>"` and paste the PSK.
 
+### Troubleshooting: `env: node: No such file or directory`
+
+Cursor does not inherit your shell's `PATH`. If `node` is installed via
+Homebrew or nvm, Cursor may not find it. The manual installer resolves this
+automatically (it writes the absolute `node` path into the rendered MCP
+snippet). If you see this error after a Marketplace install, edit
+`~/.cursor/mcp.json` and replace `"command": "node"` with the full path
+(e.g. `"/opt/homebrew/bin/node"` on macOS with Homebrew).
+
 ### Health Check
 
 ```bash
