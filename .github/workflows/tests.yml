@@ -76,7 +76,7 @@ jobs:
         run: |
           echo "--- Verifying MCP tool definitions ---"
           node -e "
-            import('../bridge/cursor_edamame_mcp.mjs').then(m => {
+            import('./bridge/cursor_edamame_mcp.mjs').then(m => {
               const toolNames = [
                 'edamame_cursor_control_center',
                 'edamame_cursor_control_center_apply_pairing',
@@ -90,7 +90,7 @@ jobs:
                 console.log('  Checking tool: ' + name);
               }
               console.log('Tool registration check passed (' + toolNames.length + ' tools)');
-            });
+            }).catch(e => { console.error('FAIL:', e.message); process.exit(1); });
           "
           echo "--- MCP bridge verification complete ---"
 
