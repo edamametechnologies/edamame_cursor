@@ -1,13 +1,13 @@
 {
   "name": "edamame",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Portable Cursor MCP bridge and behavioral-model refresh package for EDAMAME Security",
   "bin": {
-    "cursor-edamame-mcp": "./bridge/cursor_edamame_mcp.mjs",
-    "cursor-edamame-extrapolator": "./service/cursor_extrapolator.mjs",
-    "cursor-edamame-verdict-reader": "./service/verdict_reader.mjs"
+    "edamame-mcp": "./bridge/cursor_edamame_mcp.mjs",
+    "edamame-extrapolator": "./service/cursor_extrapolator.mjs",
+    "edamame-verdict-reader": "./service/verdict_reader.mjs"
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",

@@ -848,7 +848,7 @@ export async function handleRequest(config, request, runtime = {}) {
       },
       serverInfo: {
         name: "edamame",
-        version: "0.1.0",
+        version: "1.0.0",
       },
     });
   }

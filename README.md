@@ -34,17 +34,45 @@ The plugin automatically registers the MCP server, rules, skills, agents, and
 commands. After installation, run `edamame_cursor_control_center` from Cursor
 to pair with your local EDAMAME host.
 
-### Option B: Traditional MCP Install
+### Option B: Manual Install (From Source)
 
-For manual setup or environments where the marketplace is not available:
+For environments where the marketplace is not available, or when you want
+full control over the installation:
+
+1. **Clone the repo and run the installer:**
 
 ```bash
-bash setup/install.sh /path/to/workspace
+git clone https://github.com/edamametechnologies/edamame_cursor.git
+cd edamame_cursor
+bash setup/install.sh /path/to/your/workspace
 ```
 
-Wire `setup/cursor-mcp.template.json` (or the rendered `cursor-mcp.json`)
-into Cursor's MCP configuration, then run `edamame_cursor_control_center`
-from Cursor to pair with EDAMAME.
+2. **Register the MCP server in Cursor.** The installer renders a
+   `cursor-mcp.json` snippet. Merge it into your Cursor MCP settings
+   (`~/.cursor/mcp.json` or workspace `.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "edamame": {
+      "command": "node",
+      "args": [
+        "<install-root>/bridge/cursor_edamame_mcp.mjs",
+        "--config",
+        "<config-path>/config.json"
+      ]
+    }
+  }
+}
+```
+
+Replace `<install-root>` and `<config-path>` with the paths printed by the
+installer.
+
+3. **Restart Cursor**, then run `edamame_cursor_control_center` to pair
+   with your local EDAMAME host.
+
+See [Setup Guide](docs/SETUP.md) for detailed config paths per platform.
 
 ### Pairing
 

@@ -63,7 +63,7 @@ Return valid JSON matching:
       "not_expected_system_config": []
     }
   ],
-  "version": "cursor-package/0.1.0",
+  "version": "cursor-package/1.0.0",
   "hash": "",
   "ingested_at": "2026-03-06T10:05:00Z"
 }

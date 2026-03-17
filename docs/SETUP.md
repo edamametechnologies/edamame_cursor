@@ -25,7 +25,7 @@ Marketplace panel and click **Install**. The plugin registers:
 
 After installation, run `edamame_cursor_control_center` from Cursor to pair
 with your local EDAMAME host. The plugin uses the `.mcp.json` at the repo
-root. Set the `EDAMAME_CURSOR_CONFIG` environment variable to point at your
+root. Set the `CURSOR_EDAMAME_CONFIG` environment variable to point at your
 rendered config file, or run `setup/install.sh` once to generate it and then
 point the env var at the generated path.
 
