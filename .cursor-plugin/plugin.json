@@ -2,7 +2,7 @@
   "name": "edamame",
   "displayName": "EDAMAME Security",
   "version": "1.1.1",
-  "description": "Runtime behavioral monitoring for Cursor. Bridges session transcripts to the EDAMAME Security two-plane divergence engine for continuous developer workstation protection.",
+  "description": "Protect your coding sessions with real-time endpoint security. Detects when agent intent and system behavior diverge, enforces safety guardrails, and surfaces fixes -- powered by EDAMAME Security.",
   "author": {
     "name": "EDAMAME Technologies",
     "email": "info@edamame.tech"
