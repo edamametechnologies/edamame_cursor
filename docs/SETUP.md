@@ -218,6 +218,23 @@ is not already running on the same machine.
 node tests_live/run_cursor_live_suite.mjs --host-kind edamame_posture --config /absolute/path/to/config.json --json
 ```
 
+## Local E2E: synthetic Cursor JSONL and `edamame_cli` verification
+
+Prerequisites: EDAMAME host running with MCP paired, agentic/LLM available for raw ingest, and
+`edamame_cli` on `PATH` or `EDAMAME_CLI` set.
+
+```bash
+npm run e2e:inject
+# or: bash scripts/e2e_inject_intent.sh
+```
+
+The script writes three `.jsonl` files under
+`~/.cursor/projects/<workspace-basename>-edamame-e2e-inject/agent-transcripts/e2e-bucket/`
+(Cursor transcript layout), runs `cursor_extrapolator.mjs`, then polls `get_behavioral_model`
+until `predictions[]` includes all three `session_key` values. Environment variables match the
+Claude Code E2E script pattern (`E2E_POLL_ATTEMPTS`, `E2E_POLL_INTERVAL_SECS`, `E2E_STRICT_HASH`,
+`CURSOR_EDAMAME_CONFIG`).
+
 ## Health Check
 
 ```bash

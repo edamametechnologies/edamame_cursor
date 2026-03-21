@@ -179,6 +179,9 @@ function decodeFilePathToken(token, workspaceRoot) {
   }
 
   if (candidate.includes("/") && !/^LINE_\d+\|/.test(candidate) && !/^L\d+:/.test(candidate)) {
+    if (/\.git$/.test(candidate) && !candidate.startsWith("/") && !candidate.startsWith("~")) {
+      return null;
+    }
     return path.resolve(workspaceRoot, candidate);
   }
 
