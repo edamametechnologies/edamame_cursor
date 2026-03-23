@@ -29,7 +29,22 @@ root. Set the `CURSOR_EDAMAME_CONFIG` environment variable to point at your
 rendered config file, or run `setup/install.sh` once to generate it and then
 point the env var at the generated path.
 
-## Install From Source (Traditional)
+## Install via EDAMAME app / posture CLI
+
+EDAMAME downloads the latest release from GitHub (HTTP zipball -- no `git`
+required) and copies files using native Rust file operations (no `bash` or
+`python` required). Works on macOS, Linux, and Windows:
+
+```bash
+edamame-posture install-agent-plugin cursor
+edamame-posture agent-plugin-status cursor
+```
+
+The EDAMAME Security app also exposes an "Agent Plugins" section in AI
+Settings with one-click install, status display, and intent injection test
+buttons.
+
+## Install From Source (bash)
 
 ```bash
 bash setup/install.sh /absolute/path/to/target/workspace
@@ -46,6 +61,15 @@ The portable package path does not depend on `launchd`, `systemd`, or another
 OS-level scheduler. Once Cursor launches the MCP bridge, the bridge itself
 refreshes the behavioral model on the configured cadence while the Cursor
 session remains connected.
+
+## Install From Source (PowerShell, Windows)
+
+```powershell
+.\setup\install.ps1 -WorkspaceRoot "C:\Users\me\projects\myapp"
+```
+
+PowerShell equivalent of `install.sh` for native Windows environments. Does
+the same file copy + template rendering without requiring bash or python.
 
 ## Config Paths
 
