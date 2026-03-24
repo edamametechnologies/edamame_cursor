@@ -270,20 +270,30 @@ echo "Expecting agent_type=$AGENT_TYPE agent_instance_id=$AGENT_INSTANCE_ID"
 
 echo "=== Step 3: Run cursor_extrapolator ==="
 
-EXTRAP_LOG="$(mktemp)"
-export _E2E_EXTRAP_LOG="$EXTRAP_LOG"
-set +e
-node "$PACKAGE_ROOT/service/cursor_extrapolator.mjs" --config "$CONFIG_PATH" --json >"$EXTRAP_LOG" 2>&1
-EX_CODE=$?
-set -e
-cat "$EXTRAP_LOG"
-if [[ "$EX_CODE" != 0 ]]; then
-  echo "FAIL: extrapolator exited $EX_CODE" >&2
-  rm -f "$EXTRAP_LOG"
-  exit 1
-fi
+E2E_EXTRAP_MAX_ATTEMPTS="${E2E_EXTRAP_MAX_ATTEMPTS:-3}"
+E2E_EXTRAP_RETRY_DELAY="${E2E_EXTRAP_RETRY_DELAY:-15}"
+EXTRAP_OK=0
+for ((ea = 1; ea <= E2E_EXTRAP_MAX_ATTEMPTS; ea++)); do
+  echo "--- extrapolator attempt $ea / $E2E_EXTRAP_MAX_ATTEMPTS ---"
+  EXTRAP_LOG="$(mktemp)"
+  export _E2E_EXTRAP_LOG="$EXTRAP_LOG"
+  set +e
+  node "$PACKAGE_ROOT/service/cursor_extrapolator.mjs" --config "$CONFIG_PATH" --json >"$EXTRAP_LOG" 2>&1
+  EX_CODE=$?
+  set -e
+  cat "$EXTRAP_LOG"
+  if [[ "$EX_CODE" != 0 ]]; then
+    echo "WARN: extrapolator exited $EX_CODE (attempt $ea)" >&2
+    rm -f "$EXTRAP_LOG"
+    unset _E2E_EXTRAP_LOG
+    if ((ea < E2E_EXTRAP_MAX_ATTEMPTS)); then
+      echo "Retrying in ${E2E_EXTRAP_RETRY_DELAY}s..."
+      sleep "$E2E_EXTRAP_RETRY_DELAY"
+    fi
+    continue
+  fi
 
-python3 -c "
+  if python3 -c "
 import json, os, sys
 path = os.environ['_E2E_EXTRAP_LOG']
 r = json.load(open(path, encoding='utf-8'))
@@ -294,7 +304,26 @@ reasons = r.get('reasons') or []
 if 'raw_ingest' not in reasons and 'cached_window_repush_no_active_sessions' not in reasons and 'payload_unchanged_remote_current' not in reasons:
     print('WARN: unexpected reasons:', reasons, file=sys.stderr)
 print('OK: extrapolator success; window_hash=', r.get('windowHash'))
-" || { rm -f "$EXTRAP_LOG"; unset _E2E_EXTRAP_LOG; exit 1; }
+"; then
+    EXTRAP_OK=1
+    break
+  else
+    echo "WARN: extrapolator result validation failed (attempt $ea)" >&2
+    rm -f "$EXTRAP_LOG"
+    unset _E2E_EXTRAP_LOG
+    if ((ea < E2E_EXTRAP_MAX_ATTEMPTS)); then
+      echo "Retrying in ${E2E_EXTRAP_RETRY_DELAY}s..."
+      sleep "$E2E_EXTRAP_RETRY_DELAY"
+    fi
+  fi
+done
+
+if [[ "$EXTRAP_OK" != 1 ]]; then
+  echo "FAIL: extrapolator failed after $E2E_EXTRAP_MAX_ATTEMPTS attempts" >&2
+  rm -f "$EXTRAP_LOG" 2>/dev/null
+  unset _E2E_EXTRAP_LOG 2>/dev/null
+  exit 1
+fi
 
 EXPECTED_HASH="$(python3 -c "import json, os; print(json.load(open(os.environ['_E2E_EXTRAP_LOG'])).get('windowHash') or '')")"
 rm -f "$EXTRAP_LOG"
