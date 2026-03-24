@@ -40,6 +40,12 @@ edamame-posture install-agent-plugin cursor
 edamame-posture agent-plugin-status cursor
 ```
 
+The provisioning engine automatically registers the `edamame` MCP server
+entry in Cursor's global configuration (`~/.cursor/mcp.json`). Existing
+servers in that file are preserved. Uninstalling the plugin
+(`edamame-posture uninstall-agent-plugin cursor`) removes the `edamame`
+entry from the global config.
+
 The EDAMAME Security app also exposes an "Agent Plugins" section in AI
 Settings with one-click install, status display, and intent injection test
 buttons.
@@ -54,13 +60,11 @@ The installer:
 
 - copies the package into a stable per-user install directory,
 - renders a default package config,
-- renders a Cursor MCP snippet,
-- renders optional scheduler templates for operators that want out-of-band execution.
-
-The portable package path does not depend on `launchd`, `systemd`, or another
-OS-level scheduler. Once Cursor launches the MCP bridge, the bridge itself
-refreshes the behavioral model on the configured cadence while the Cursor
-session remains connected.
+- renders a Cursor MCP snippet with fully resolved paths (including absolute `node` path),
+- automatically injects the `edamame` server entry into Cursor's global MCP configuration (`~/.cursor/mcp.json`), preserving any existing servers,
+Once Cursor launches the MCP bridge, the bridge itself refreshes the
+behavioral model on the configured cadence while the Cursor session
+remains connected.
 
 ## Install From Source (PowerShell, Windows)
 
@@ -105,10 +109,16 @@ Key fields:
 
 ## Cursor MCP Registration
 
-The installer renders a `cursor-mcp.json` snippet with fully resolved paths,
-including the absolute path to `node`. Merge it into your Cursor MCP
-configuration (`~/.cursor/mcp.json` or workspace `.cursor/mcp.json`). The
-snippet location is printed at the end of the install.
+When installing via the EDAMAME app, `edamame-posture install-agent-plugin
+cursor`, or `bash setup/install.sh`, the `edamame` MCP server entry is
+automatically injected into Cursor's global MCP configuration
+(`~/.cursor/mcp.json`). Any existing servers in that file are preserved.
+
+A rendered `cursor-mcp.json` snippet with fully resolved paths (including
+the absolute path to `node`) is also saved to the config directory for
+reference. If the automatic injection failed or you need to re-register
+manually, merge that snippet into `~/.cursor/mcp.json` or your workspace
+`.cursor/mcp.json`.
 
 ### Troubleshooting: `env: node: No such file or directory`
 

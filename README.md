@@ -47,13 +47,14 @@ cd edamame_cursor
 bash setup/install.sh /path/to/your/workspace
 ```
 
-2. **Register the MCP server in Cursor.** The installer renders a
-   `cursor-mcp.json` snippet with fully resolved paths. Merge it into your
-   Cursor MCP settings (`~/.cursor/mcp.json` or workspace `.cursor/mcp.json`).
-   The snippet path is printed at the end of the install.
-
-3. **Restart Cursor**, then run `edamame_cursor_control_center` to pair
+2. **Restart Cursor**, then run `edamame_cursor_control_center` to pair
    with your local EDAMAME host.
+
+The installer automatically registers the `edamame` MCP server entry in
+Cursor's global configuration (`~/.cursor/mcp.json`). When installing via
+the EDAMAME app or `edamame-posture install-agent-plugin cursor`, the same
+automatic registration is performed by the provisioning engine. If Cursor's
+global MCP config already contains other servers, they are preserved.
 
 See [Setup Guide](docs/SETUP.md) for detailed config paths per platform.
 
@@ -62,9 +63,10 @@ See [Setup Guide](docs/SETUP.md) for detailed config paths per platform.
 - **macOS / Windows**: Start the EDAMAME Security app, enable MCP on port
   3000. Primary: click "Request pairing from app" in the control center and
   approve in the app. Fallback: generate a PSK and paste it into the control center.
-- **Linux**: Run `edamame_cursor_control_center` and use
-  "Generate, start, and pair automatically", or manually start
-  `edamame_posture mcp-start 3000 "<PSK>"` and paste the PSK.
+- **Linux**: Run `edamame-posture mcp-generate-psk` then
+  `edamame-posture mcp-start 3000 "<PSK>"`, and paste the PSK into the
+  control center. Or run `edamame_cursor_control_center` and use
+  "Generate, start, and pair automatically".
 
 ### Troubleshooting: `env: node: No such file or directory`
 
@@ -105,11 +107,10 @@ bash setup/healthcheck.sh --strict --json
 | `bridge/` | Local stdio MCP bridge, control center MCP App, forwarding surface |
 | `adapters/` | Cursor transcript parsing and `RawReasoningSessionPayload` assembly |
 | `service/` | Control center, extrapolator, posture facade, verdict reader, health checks |
-| `scheduler/` | Optional launchd and systemd user-job templates |
 | `setup/` | Install, bundle, and health-check scripts plus config templates |
 | `prompts/` | Prompt contract used by EDAMAME-side raw-session ingest |
 | `docs/` | Architecture, setup, operator guidance, validation |
-| `demo/` | Demo trigger scripts for divergence and CVE detection validation |
+| -- | E2E tests live in [agent_security/tests/e2e](https://github.com/edamametechnologies/agent_security/tree/main/tests/e2e) (`--agent-type cursor`) |
 | `tests/` | Unit tests |
 
 ## Documentation
