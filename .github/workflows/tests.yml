@@ -87,7 +87,9 @@ jobs:
             service/health.mjs \
             service/config.mjs \
             setup/install.sh \
-            setup/healthcheck.sh; do
+            setup/healthcheck.sh \
+            commands/healthcheck.md \
+            commands/export-intent.md; do
             test -f "$f" || { echo "FAIL: $f not found"; exit 1; }
             echo "  OK: $f"
           done
