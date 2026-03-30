@@ -226,10 +226,7 @@ function extractPaths(text, workspaceRoot) {
       rawAppTokens.some((raw) => raw.includes(token) && raw !== token) ||
       paths.some((existing) => existing.includes(token) && existing !== token);
     if (isAppFragment) continue;
-    const normalized = decodeFilePathToken(token, workspaceRoot);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    paths.push(normalized);
+    addPath(m[0]);
   }
 
   // Pass 3: Windows paths with spaces (Program Files, AppData).
