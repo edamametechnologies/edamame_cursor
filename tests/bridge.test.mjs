@@ -363,7 +363,7 @@ test("bridge can dispatch dry-run extrapolation and healthcheck tools", async ()
   assert.equal(healthPayload.checks.some((check) => check.name === "psk.file"), true);
 });
 
-test("healthcheck flags posture system service when expected but not ready", async () => {
+test("healthcheck flags posture system service when expected but not ready", { skip: process.platform === "win32" }, async () => {
   const config = await makeBridgeFixture({
     hostKind: "edamame_posture",
     withMockSystemctl: true,
@@ -433,7 +433,7 @@ test("control center pairing stores PSK and updates config", async () => {
   assert.equal(payload.config.hostKind, "edamame_posture");
 });
 
-test("control center can auto-pair a local posture host", async () => {
+test("control center can auto-pair a local posture host", { skip: process.platform === "win32" }, async () => {
   const config = await makeBridgeFixture({
     withPsk: false,
     hostKind: "edamame_posture",
