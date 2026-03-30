@@ -43,8 +43,12 @@ permissions: read-all
 
 jobs:
   test:
-    name: Install and test
-    runs-on: ubuntu-latest
+    name: Install and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
 
@@ -65,9 +69,10 @@ jobs:
       - name: Validate plugin manifest
         run: |
           echo "--- Validating plugin manifest ---"
-          test -f .cursor-plugin/plugin.json || { echo "FAIL: .cursor-plugin/plugin.json not found"; exit 1; }
           node -e "
-            const m = JSON.parse(require('fs').readFileSync('.cursor-plugin/plugin.json', 'utf8'));
+            const fs = require('fs');
+            if (!fs.existsSync('.cursor-plugin/plugin.json')) { console.error('FAIL: .cursor-plugin/plugin.json not found'); process.exit(1); }
+            const m = JSON.parse(fs.readFileSync('.cursor-plugin/plugin.json', 'utf8'));
             console.log('Plugin name:', m.name);
             console.log('Plugin version:', m.version);
             if (!m.name) { console.error('FAIL: missing name'); process.exit(1); }
@@ -77,51 +82,78 @@ jobs:
       - name: Verify plugin structure
         run: |
           echo "--- Checking plugin file structure ---"
-          for f in \
-            bridge/cursor_edamame_mcp.mjs \
-            bridge/edamame_client.mjs \
-            bridge/control_center_app.html \
-            adapters/session_prediction_adapter.mjs \
-            service/cursor_extrapolator.mjs \
-            service/control_center.mjs \
-            service/health.mjs \
-            service/config.mjs \
-            setup/install.sh \
-            setup/healthcheck.sh \
-            commands/healthcheck.md \
-            commands/export-intent.md; do
-            test -f "$f" || { echo "FAIL: $f not found"; exit 1; }
-            echo "  OK: $f"
-          done
+          node -e "
+            const fs = require('fs');
+            const files = [
+              'bridge/cursor_edamame_mcp.mjs',
+              'bridge/edamame_client.mjs',
+              'bridge/control_center_app.html',
+              'adapters/session_prediction_adapter.mjs',
+              'service/cursor_extrapolator.mjs',
+              'service/control_center.mjs',
+              'service/health.mjs',
+              'service/config.mjs',
+              'setup/install.sh',
+              'setup/healthcheck.sh',
+              'commands/healthcheck.md',
+              'commands/export-intent.md',
+            ];
+            let ok = true;
+            for (const f of files) {
+              if (!fs.existsSync(f)) { console.error('FAIL: ' + f + ' not found'); ok = false; }
+              else { console.log('  OK: ' + f); }
+            }
+            if (!ok) process.exit(1);
+          "
           echo "--- Plugin structure valid ---"
 
-      - name: Run manual install
+      - name: Run manual install (Unix)
+        if: runner.os != 'Windows'
         run: |
           echo "--- Running manual install ---"
           bash setup/install.sh "$PWD"
           echo "--- Manual install completed ---"
 
+      - name: Run manual install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          echo "--- Running manual install ---"
+          .\setup\install.ps1 -WorkspaceRoot "$PWD"
+          echo "--- Manual install completed ---"
+
       - name: Run unit tests
         run: npm test
 
-      - name: Verify MCP bridge tool registration
+      - name: Verify MCP bridge tool contract
         run: |
           echo "--- Verifying MCP tool definitions ---"
           node -e "
             import('./bridge/cursor_edamame_mcp.mjs').then(m => {
-              const toolNames = [
+              const toolNames = (m.TOOL_DEFINITIONS || []).map((tool) => tool.name);
+              const resourceUris = (m.RESOURCE_DEFINITIONS || []).map((resource) => resource.uri);
+              const expectedToolNames = [
                 'edamame_cursor_control_center',
+                'edamame_cursor_control_center_refresh',
+                'edamame_cursor_control_center_refresh_now',
                 'edamame_cursor_control_center_apply_pairing',
                 'edamame_cursor_control_center_run_host_action',
                 'edamame_cursor_control_center_request_app_pairing',
-                'cursor.refresh_behavioral_model',
-                'cursor.healthcheck',
-                'cursor.posture_summary',
+                'cursor_refresh_behavioral_model',
+                'cursor_healthcheck',
+                'cursor_posture_summary',
+                'edamame_get_divergence_verdict',
+                'edamame_get_score'
               ];
-              for (const name of toolNames) {
+              for (const name of expectedToolNames) {
+                if (!toolNames.includes(name)) { console.error('FAIL: missing tool ' + name); process.exit(1); }
                 console.log('  Checking tool: ' + name);
               }
-              console.log('Tool registration check passed (' + toolNames.length + ' tools)');
+              if (!resourceUris.includes('ui://edamame/control-center.html')) {
+                console.error('FAIL: missing control center resource');
+                process.exit(1);
+              }
+              console.log('Tool contract check passed (' + toolNames.length + ' tools)');
             }).catch(e => { console.error('FAIL:', e.message); process.exit(1); });
           "
           echo "--- MCP bridge verification complete ---"
@@ -132,7 +164,7 @@ jobs:
         with:
           channel-id: "C072J0U9TH7"
           slack-message: |
-            *edamame_cursor CI Failed*
+            *edamame_cursor CI Failed (${{ matrix.os }})*
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref }}
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

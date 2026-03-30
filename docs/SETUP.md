@@ -53,27 +53,35 @@ buttons.
 ## Install From Source (bash)
 
 ```bash
-bash setup/install.sh /absolute/path/to/target/workspace
+bash setup/install.sh [/optional/path/to/workspace]
 ```
+
+The workspace argument is **optional**. When provided, it seeds
+`transcript_project_hints` and derives the `agent_instance_id`. When omitted,
+the plugin monitors transcripts from **all** workspaces.
 
 The installer:
 
-- copies the package into a stable per-user install directory,
-- renders a default package config,
+- copies the package into a **global per-user** install directory (one copy per
+  machine, shared across all workspaces),
+- renders a default package config (only on first install -- existing config
+  is preserved),
 - renders a Cursor MCP snippet with fully resolved paths (including absolute `node` path),
-- automatically injects the `edamame` server entry into Cursor's global MCP configuration (`~/.cursor/mcp.json`), preserving any existing servers,
+- automatically injects the `edamame` server entry into Cursor's global MCP configuration (`~/.cursor/mcp.json`), preserving any existing servers.
+
 Once Cursor launches the MCP bridge, the bridge itself refreshes the
 behavioral model on the configured cadence while the Cursor session
-remains connected.
+remains connected. There is no need to reinstall when switching workspaces.
 
 ## Install From Source (PowerShell, Windows)
 
 ```powershell
-.\setup\install.ps1 -WorkspaceRoot "C:\Users\me\projects\myapp"
+.\setup\install.ps1 [-WorkspaceRoot "C:\Users\me\projects\myapp"]
 ```
 
-PowerShell equivalent of `install.sh` for native Windows environments. Does
-the same file copy + template rendering without requiring bash or python.
+PowerShell equivalent of `install.sh` for native Windows environments. The
+`-WorkspaceRoot` parameter is optional (same semantics as the bash installer).
+Does the same file copy + template rendering without requiring bash or python.
 
 ## Config Paths
 
@@ -132,7 +140,7 @@ snippet). If you see this error after a Marketplace install, edit
 
 The bridge process is the portable runtime entrypoint for both:
 
-- on-demand tools such as `cursor.refresh_behavioral_model`
+- on-demand tools such as `cursor_refresh_behavioral_model`
 - automatic periodic behavioral-model refresh while Cursor is open
 - the `edamame_cursor_control_center` MCP App used for pairing and status
 

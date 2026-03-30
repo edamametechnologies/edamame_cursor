@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 Usage: bash setup/install.sh [workspace_root]
 
-Installs the Cursor EDAMAME package for the target workspace.
+Installs EDAMAME for Cursor (global per-user install).
 Behavioral-model refresh is driven by Cursor's stdio MCP lifecycle --
 the bridge refreshes on initialization and tool calls.
 EOF
@@ -188,7 +188,7 @@ inject_mcp_entry(cursor_mcp_path, Path.home() / ".cursor" / "mcp.json")
 PY
 
 cat <<EOF
-Installed Cursor EDAMAME package to:
+Installed EDAMAME for Cursor to:
   $INSTALL_ROOT
 
 Primary config:

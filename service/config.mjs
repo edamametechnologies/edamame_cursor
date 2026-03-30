@@ -109,14 +109,32 @@ export const DEFAULT_CONFIG = Object.freeze({
     // macOS: main binary and all helper variants (Plugin, Renderer, GPU)
     "*/Cursor.app/Contents/MacOS/Cursor",
     "*/Cursor Helper*",
-    // Windows: main binary and helpers under AppData\Local\Programs\Cursor
+    // Windows: main binary and helpers (forward- and backslash for L7 paths)
     "*/Cursor/Cursor.exe",
+    "*\\Cursor\\Cursor.exe",
     "*/Cursor/Cursor Helper*.exe",
+    "*\\Cursor\\Cursor Helper*.exe",
+    "*/Programs/Cursor/",
+    "*\\Programs\\Cursor\\",
+    "*/AppData/Local/Programs/Cursor",
+    "*\\AppData\\Local\\Programs\\Cursor",
+    "*/WindowsApps/Cursor*",
+    "*\\WindowsApps\\Cursor*",
     // Linux AppImage: FUSE mount at /tmp/.mount_cursor<random>/cursor
     "/tmp/.mount_cursor*",
-    // Linux extracted / system-installed
+    // Linux: extracted install, package managers, user PATH
     "*/cursor/cursor",
     "/opt/cursor*",
+    "*/.local/bin/cursor",
+    "/usr/bin/cursor",
+    "/usr/local/bin/cursor",
+    "*/flatpak/",
+    "/snap/bin/cursor",
+    "*/snap/cursor/",
+    // Node (MCP / tooling) -- match other agent packages
+    "*/node",
+    "*/node.exe",
+    "*\\node.exe",
     // MCP bridge script spawned by the Cursor package
     "*/cursor_edamame_mcp.mjs",
   ],

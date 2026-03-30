@@ -857,7 +857,7 @@ export async function requestAppPairing(config, args = {}) {
   const pairUrl = `${baseUrl}/mcp/pair`;
 
   const body = {
-    client_name: String(args.client_name || config.clientName || "Cursor EDAMAME Bridge").trim(),
+    client_name: String(args.client_name || config.clientName || "EDAMAME for Cursor").trim(),
     agent_type: String(config.agentType || "cursor"),
     agent_instance_id: String(config.agentInstanceId || "unknown"),
     requested_endpoint: endpoint,

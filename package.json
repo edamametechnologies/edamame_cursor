@@ -12,6 +12,6 @@
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "build:bundle": "bash setup/build_bundle.sh",
-    "e2e:inject": "bash scripts/e2e_inject_intent.sh"
+    "e2e:inject": "bash tests/e2e_inject_intent.sh"
   }
 }

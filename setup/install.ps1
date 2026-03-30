@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Installs the Cursor EDAMAME package for a target workspace on Windows.
+    Installs EDAMAME for Cursor (global per-user install) on Windows.
 
 .DESCRIPTION
     PowerShell equivalent of setup/install.sh for Windows environments.
@@ -136,7 +136,7 @@ try {
 
 Write-Host @"
 
-Installed Cursor EDAMAME package to:
+Installed EDAMAME for Cursor to:
   $InstallRoot
 
 Primary config:
@@ -150,7 +150,7 @@ MCP server registered automatically in ~\.cursor\mcp.json
 Next steps:
 1. Launch Cursor and run the edamame_cursor_control_center tool.
 2. Click 'Request pairing from app' in the control center, or paste a PSK manually.
-3. Run: node "$InstallRoot\setup\healthcheck_cli.mjs" --strict --json
+3. Run: node "$InstallRoot\service\healthcheck_cli.mjs" --strict --json
 "@
 
 # SIG # Begin signature block

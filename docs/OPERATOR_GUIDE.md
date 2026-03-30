@@ -51,6 +51,6 @@ recover without waiting for a fresh transcript update.
 ## Failure Modes
 
 - Missing credential file: use `edamame_cursor_control_center` to pair. On macOS/Windows, "Request pairing from app" or paste a PSK; on Linux, paste and store a fresh local PSK.
-- MCP unreachable: `cursor.healthcheck` and `setup/healthcheck.sh` report endpoint failure.
+- MCP unreachable: `cursor_healthcheck` and `setup/healthcheck.sh` report endpoint failure.
 - Divergence engine disabled: health checks stay unhealthy until the operator re-enables the engine in the app path.
 - No relevant transcripts and no cached slice: the extrapolator exits non-zero with `no_sessions`.

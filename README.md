@@ -44,8 +44,13 @@ full control over the installation:
 ```bash
 git clone https://github.com/edamametechnologies/edamame_cursor.git
 cd edamame_cursor
-bash setup/install.sh /path/to/your/workspace
+bash setup/install.sh [/path/to/your/workspace]
 ```
+
+The workspace argument is **optional**. It seeds `transcript_project_hints`
+and `agent_instance_id`. When omitted, the plugin monitors transcripts from
+all workspaces. The install is **global per-user** -- no need to reinstall
+when switching projects.
 
 2. **Restart Cursor**, then run `edamame_cursor_control_center` to pair
    with your local EDAMAME host.

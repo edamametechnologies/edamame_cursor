@@ -19,6 +19,6 @@
     "mcp",
     "edamame"
   ],
-  "logo": "assets/logo.png",
+  "logo": "assets/plugin_cursor.png",
   "mcpServers": ".mcp.json"
 }
