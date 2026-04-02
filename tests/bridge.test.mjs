@@ -1293,3 +1293,58 @@ test("runLatestExtrapolation pushes heartbeat window when no sessions and no cac
   assert.deepEqual(savedStates[0].lastReasons, ["heartbeat"]);
   assert.equal(savedStates[0].lastGeneratedWindow.agent_type, "cursor");
 });
+
+test("runLatestExtrapolation heartbeat carries forward not_expected rules from prior window (G-03)", async () => {
+  const config = await makeBridgeFixture();
+  const savedStates = [];
+  let capturedWindowJson = null;
+
+  const result = await runLatestExtrapolation(config, {
+    buildPayload: async () => ({
+      sessions: [],
+      rawSessions: {
+        agent_type: "cursor",
+        agent_instance_id: "cursor-bridge-test",
+        source_kind: "cursor",
+        sessions: [],
+      },
+      rawPayloadHash: "payload-empty",
+    }),
+    loadState: async () => ({
+      lastGeneratedWindow: {
+        predictions: [
+          {
+            not_expected_traffic: ["evil.com:443"],
+            not_expected_sensitive_files: ["~/.ssh/id_rsa"],
+            not_expected_process_paths: ["*/nc"],
+            not_expected_open_files: ["~/.aws/credentials"],
+          },
+        ],
+      },
+    }),
+    saveState: async (_cfg, _name, value) => {
+      savedStates.push(value);
+    },
+    makeClient: async () => ({
+      invoke: async (toolName, params) => {
+        if (toolName === "upsert_behavioral_model") {
+          capturedWindowJson = params.window_json;
+          return { ok: true };
+        }
+        throw new Error(`unexpected_tool:${toolName}`);
+      },
+    }),
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.upserted, true);
+  assert.ok(result.reasons.includes("heartbeat"));
+
+  const heartbeat = JSON.parse(capturedWindowJson);
+  assert.ok(heartbeat.predictions[0].not_expected_traffic.includes("evil.com:443"));
+  assert.ok(heartbeat.predictions[0].not_expected_sensitive_files.includes("~/.ssh/id_rsa"));
+  assert.ok(heartbeat.predictions[0].not_expected_process_paths.includes("*/nc"));
+  assert.ok(heartbeat.predictions[0].not_expected_open_files.includes("~/.aws/credentials"));
+
+  assert.equal(savedStates.length, 1);
+});
