@@ -585,6 +585,10 @@ function parseTxtTranscript(rawText) {
   }
   flush();
 
+  if (rawText.trim() && userSections.length === 0 && assistantSections.length === 0) {
+    console.warn("[edamame] parseTxtTranscript: no role markers (user:/assistant:) found in non-empty transcript; format may have changed");
+  }
+
   return {
     userText: userSections.join("\n\n").trim(),
     assistantText: assistantSections.join("\n\n").trim(),
