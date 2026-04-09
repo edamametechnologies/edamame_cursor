@@ -551,7 +551,7 @@ jobs:
           PYSTAT
             while ((waited <= max_wait)); do
               local status
-              status="$(EDAMAME_CLI_BIN="$CLI" TRIGGERS_PATH="$TRIGGERS_DIR" python3 "$_pystat" 2>/dev/null)" || status="0|0|0"
+              status="$(EDAMAME_CLI_BIN="$CLI" TRIGGERS_PATH="$TRIGGERS_DIR" python3 "$_pystat" 2>&1)" || status="0|0|0"
               local age="${status%%|*}"
               local rest="${status#*|}"
               local contrib="${rest%%|*}"
