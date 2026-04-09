@@ -545,17 +545,19 @@ jobs:
           from _edamame_cli import cli_rpc
           try:
               s = cli_rpc('get_divergence_engine_status')
+              print(f'DEBUG type={type(s).__name__} val={str(s)[:200]}', file=sys.stderr)
               age = s.get('model_age_secs') if isinstance(s, dict) else 0
               contrib = s.get('contributor_count') if isinstance(s, dict) else 0
               running = bool(s.get('running')) if isinstance(s, dict) else False
               print(f'{int(age or 0)}|{int(contrib or 0)}|{1 if running else 0}')
           except Exception as e:
-              print(f'0|0|0|err={e}', file=sys.stderr)
+              print(f'ERR type={type(e).__name__} msg={e}', file=sys.stderr)
               print('0|0|0')
           PYSTAT
             while ((waited <= max_wait)); do
               local status
-              status="$(EDAMAME_CLI_BIN="$CLI" TRIGGERS_PATH="$TRIGGERS_DIR" python3 "$_pystat" 2>&1)" || status="0|0|0"
+              EDAMAME_CLI_BIN="$CLI" TRIGGERS_PATH="$TRIGGERS_DIR" python3 "$_pystat" > /tmp/_pystat_out 2> /tmp/_pystat_err; status="$(cat /tmp/_pystat_out 2>/dev/null)" || status="0|0|0"
+              [[ -s /tmp/_pystat_err ]] && echo "    pystat_debug: $(cat /tmp/_pystat_err)"
               local age="${status%%|*}"
               local rest="${status#*|}"
               local contrib="${rest%%|*}"
