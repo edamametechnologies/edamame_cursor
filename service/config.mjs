@@ -97,6 +97,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     "api.openai.com:443",
     "api.anthropic.com:443",
     "amazonaws.com:443",
+    "awsglobalaccelerator.com:443",
     "asn:CLOUDFLARENET",
     // Notion's AS33191 IPs are now served via Cloudflare; the ASN owner
     // string in ip2asn still reads "NOTION" so we need a separate entry.
