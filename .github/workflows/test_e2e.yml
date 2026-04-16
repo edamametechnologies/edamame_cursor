@@ -742,17 +742,41 @@ jobs:
 
           daemon_diag() {
             echo "=== DAEMON DIAGNOSTICS ($1) ==="
-            "$CLI" rpc get_score 2>/dev/null | head -c 200 && echo " [daemon alive]" || echo " [daemon UNREACHABLE]"
-            "$CLI" rpc get_capture_status 2>/dev/null | head -c 500 || echo "get_capture_status unavailable"
-            echo "--- recent logs ---"
-            "$CLI" rpc get_all_logs 2>/dev/null | tail -c 3000 || echo "get_all_logs unavailable"
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              echo "--- process check ---"
+              tasklist //FI "IMAGENAME eq edamame_posture.exe" 2>/dev/null || echo "tasklist unavailable"
+              echo "--- port check ---"
+              netstat -an 2>/dev/null | grep -E "40152|:3000" || echo "no matching ports"
+            else
+              ps aux 2>/dev/null | grep -i edamame_posture | grep -v grep || echo "no posture process"
+            fi
+            echo "--- rpc health ---"
+            timeout 5 "$CLI" rpc get_core_version 2>&1 | head -c 300 || echo "[RPC FAILED]"
+            echo "--- capture status ---"
+            timeout 5 "$CLI" rpc get_capture_status 2>&1 | head -c 500 || echo "[capture status FAILED]"
+            echo "--- new logs ---"
+            timeout 5 "$CLI" rpc get_new_logs 2>&1 | tail -c 4000 || echo "[get_new_logs FAILED]"
             echo "=== END DIAGNOSTICS ==="
           }
 
+          daemon_diag "before start_capture"
+
           echo "--- Starting packet capture ---"
           "$CLI" rpc start_capture 2>&1 || echo "WARN: start_capture failed"
-          sleep 10
-          daemon_diag "after start_capture"
+
+          echo "--- immediate post-start check ---"
+          timeout 5 "$CLI" rpc get_core_version 2>&1 | head -c 200 || echo "[RPC FAILED immediately after start_capture]"
+
+          for i in 1 2 3 4 5; do
+            sleep 2
+            echo "--- health check $i ($(( i * 2 ))s after start_capture) ---"
+            timeout 5 "$CLI" rpc get_core_version 2>&1 | head -c 200 || echo "[RPC FAILED at ${i}x2s]"
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              tasklist //FI "IMAGENAME eq edamame_posture.exe" 2>/dev/null | grep -i posture || echo "[PROCESS GONE at ${i}x2s]"
+            fi
+          done
+
+          daemon_diag "after start_capture (10s)"
 
           run_scenario "cve_token_exfil" "portquiz"
           daemon_diag "after cve_token_exfil"
