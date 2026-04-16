@@ -740,21 +740,31 @@ jobs:
           echo "Trigger duration: ${TRIGGER_DURATION}s"
           echo ""
 
+          daemon_diag() {
+            echo "=== DAEMON DIAGNOSTICS ($1) ==="
+            "$CLI" rpc get_score 2>/dev/null | head -c 200 && echo " [daemon alive]" || echo " [daemon UNREACHABLE]"
+            "$CLI" rpc get_capture_status 2>/dev/null | head -c 500 || echo "get_capture_status unavailable"
+            echo "--- recent logs ---"
+            "$CLI" rpc get_all_logs 2>/dev/null | tail -c 3000 || echo "get_all_logs unavailable"
+            echo "=== END DIAGNOSTICS ==="
+          }
+
           echo "--- Starting packet capture ---"
           "$CLI" rpc start_capture 2>&1 || echo "WARN: start_capture failed"
           sleep 10
-          echo "--- Capture diagnostics ---"
-          "$CLI" rpc get_capture_status 2>/dev/null | head -c 500 || echo "get_capture_status unavailable"
-          echo ""
+          daemon_diag "after start_capture"
 
           run_scenario "cve_token_exfil" "portquiz"
+          daemon_diag "after cve_token_exfil"
           run_scenario "cve_sandbox_escape" "1.0.0.1"
           run_scenario "memory_poisoning" "portquiz"
           run_scenario "credential_sprawl" "portquiz"
           run_scenario "tool_poisoning_effects" "portquiz"
           run_scenario "supply_chain_exfil" "portquiz"
           run_scenario "blacklist_comm" "5.188.11"
+          daemon_diag "before divergence"
           run_scenario "divergence" "1.0.0.1"
+          daemon_diag "after divergence"
           run_scenario "goal_drift" "1.1.1.1"
 
           echo ""
