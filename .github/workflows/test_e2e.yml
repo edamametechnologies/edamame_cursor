@@ -390,6 +390,33 @@ jobs:
           CLI="$EDAMAME_CLI"
           AGENT_TYPE="cursor"
 
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "=== GCC pre-check (from Python) ==="
+            python3 -c "
+          import os, subprocess, sys, shutil
+          cc = os.environ.get('CC','')
+          print(f'CC={cc!r}')
+          print(f'sys.platform={sys.platform}')
+          print(f'gcc_on_path={shutil.which(\"gcc\")}')
+          print(f'cc_on_path={shutil.which(cc) if cc else None}')
+          if cc:
+              try:
+                  r = subprocess.run([cc, '--version'], capture_output=True, text=True, timeout=10)
+                  print(f'cc_returncode={r.returncode}')
+                  print(f'cc_stdout={r.stdout[:200]}')
+                  print(f'cc_stderr={r.stderr[:200]}')
+              except Exception as e:
+                  print(f'cc_exception={e}')
+          for c in ['gcc', 'cc']:
+              try:
+                  r = subprocess.run([c, '--version'], capture_output=True, text=True, timeout=10)
+                  print(f'{c}_returncode={r.returncode}')
+              except Exception as e:
+                  print(f'{c}_exception={e}')
+          "
+            echo "=== end GCC pre-check ==="
+          fi
+
           TRIGGER_DURATION=60
           POST_WAIT=30
           COOLDOWN=5
