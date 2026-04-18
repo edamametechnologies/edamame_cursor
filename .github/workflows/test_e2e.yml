@@ -282,6 +282,29 @@ jobs:
             console.log('Installed version:', pkg.version);
           "
 
+      # ── Verify plugin manifest ───────────────────────────────────
+
+      - name: Verify plugin manifest
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const manifest = path.join(process.env.INSTALL_ROOT, '.cursor-plugin', 'plugin.json');
+            if (!fs.existsSync(manifest)) { console.error('FAIL: ' + manifest + ' not found'); process.exit(1); }
+            const m = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+            for (const key of ['name', 'version']) {
+              if (!m[key]) { console.error('FAIL: missing ' + key + ' in plugin manifest'); process.exit(1); }
+              console.log('  ' + key + ': ' + m[key]);
+            }
+            const pkg = JSON.parse(fs.readFileSync(path.join(process.env.INSTALL_ROOT, 'package.json'), 'utf8'));
+            if (m.version !== pkg.version) {
+              console.error('FAIL: plugin.json version (' + m.version + ') != package.json version (' + pkg.version + ')');
+              process.exit(1);
+            }
+            console.log('Plugin manifest valid');
+          "
+
       # ── Verify global MCP registration ──────────────────────────
 
       - name: Verify global MCP config
@@ -740,55 +763,21 @@ jobs:
           echo "Trigger duration: ${TRIGGER_DURATION}s"
           echo ""
 
-          daemon_diag() {
-            echo "=== DAEMON DIAGNOSTICS ($1) ==="
-            if [[ "$RUNNER_OS" == "Windows" ]]; then
-              echo "--- process check ---"
-              tasklist //FI "IMAGENAME eq edamame_posture.exe" 2>/dev/null || echo "tasklist unavailable"
-              echo "--- port check ---"
-              netstat -an 2>/dev/null | grep -E "40152|:3000" || echo "no matching ports"
-            else
-              ps aux 2>/dev/null | grep -i edamame_posture | grep -v grep || echo "no posture process"
-            fi
-            echo "--- rpc health ---"
-            timeout 5 "$CLI" rpc get_core_version 2>&1 | head -c 300 || echo "[RPC FAILED]"
-            echo "--- capture status ---"
-            timeout 5 "$CLI" rpc get_capture_status 2>&1 | head -c 500 || echo "[capture status FAILED]"
-            echo "--- new logs ---"
-            timeout 5 "$CLI" rpc get_new_logs 2>&1 | tail -c 4000 || echo "[get_new_logs FAILED]"
-            echo "=== END DIAGNOSTICS ==="
-          }
-
-          daemon_diag "before start_capture"
-
           echo "--- Starting packet capture ---"
           "$CLI" rpc start_capture 2>&1 || echo "WARN: start_capture failed"
-
-          echo "--- immediate post-start check ---"
-          timeout 5 "$CLI" rpc get_core_version 2>&1 | head -c 200 || echo "[RPC FAILED immediately after start_capture]"
-
-          for i in 1 2 3 4 5; do
-            sleep 2
-            echo "--- health check $i ($(( i * 2 ))s after start_capture) ---"
-            timeout 5 "$CLI" rpc get_core_version 2>&1 | head -c 200 || echo "[RPC FAILED at ${i}x2s]"
-            if [[ "$RUNNER_OS" == "Windows" ]]; then
-              tasklist //FI "IMAGENAME eq edamame_posture.exe" 2>/dev/null | grep -i posture || echo "[PROCESS GONE at ${i}x2s]"
-            fi
-          done
-
-          daemon_diag "after start_capture (10s)"
+          sleep 10
+          echo "--- Capture diagnostics ---"
+          "$CLI" rpc get_capture_status 2>/dev/null | head -c 500 || echo "get_capture_status unavailable"
+          echo ""
 
           run_scenario "cve_token_exfil" "portquiz"
-          daemon_diag "after cve_token_exfil"
           run_scenario "cve_sandbox_escape" "1.0.0.1"
           run_scenario "memory_poisoning" "portquiz"
           run_scenario "credential_sprawl" "portquiz"
           run_scenario "tool_poisoning_effects" "portquiz"
           run_scenario "supply_chain_exfil" "portquiz"
           run_scenario "blacklist_comm" "5.188.11"
-          daemon_diag "before divergence"
           run_scenario "divergence" "1.0.0.1"
-          daemon_diag "after divergence"
           run_scenario "goal_drift" "1.1.1.1"
 
           echo ""
