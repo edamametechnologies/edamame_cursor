@@ -6,6 +6,9 @@ This package bridges Cursor transcripts (reasoning plane) to the
 [EDAMAME Security](https://edamame.tech) system-plane observer, enabling
 two-plane divergence detection on developer machines.
 
+This is a named Cursor integration for EDAMAME Security, not a separate
+EDAMAME product surface.
+
 ## How It Works
 
 1. Cursor produces session transcripts while you code.
@@ -57,7 +60,7 @@ when switching projects.
 
 The installer automatically registers the `edamame` MCP server entry in
 Cursor's global configuration (`~/.cursor/mcp.json`). When installing via
-the EDAMAME app or `edamame-posture install-agent-plugin cursor`, the same
+the EDAMAME Security app or `edamame-posture install-agent-plugin cursor`, the same
 automatic registration is performed by the provisioning engine. If Cursor's
 global MCP config already contains other servers, they are preserved.
 
@@ -156,11 +159,15 @@ The full cross-agent E2E harness (intent + CVE/divergence) lives in
 
 | Repository | Purpose |
 |------------|---------|
-| [edamame_openclaw](https://github.com/edamametechnologies/edamame_openclaw) | EDAMAME integration for OpenClaw agents |
+| [edamame_openclaw](https://github.com/edamametechnologies/edamame_openclaw) | EDAMAME OpenClaw integration |
 | [edamame_claude_code](https://github.com/edamametechnologies/edamame_claude_code) | EDAMAME integration for Claude Code |
 | [agent_security](https://github.com/edamametechnologies/agent_security) | Research paper: two-plane runtime security (arXiv preprint) |
+| [edamame_security](https://github.com/edamametechnologies/edamame_security) | EDAMAME Security desktop/mobile app |
+| [edamame_posture](https://github.com/edamametechnologies/edamame_posture) | EDAMAME Posture CLI for CI/CD and servers |
+| [edamame_core_api](https://github.com/edamametechnologies/edamame_core_api) | EDAMAME Core public API documentation |
+| [threatmodels](https://github.com/edamametechnologies/threatmodels) | Public security benchmarks, policies, and threat models |
 
-### Sibling Agent Integrations
+### Related Named Integrations
 
 - **edamame_claude_code** (Claude Code): Easy install via Claude Code marketplace:
   ```shell
@@ -168,10 +175,6 @@ The full cross-agent E2E harness (intent + CVE/divergence) lives in
   /plugin install edamame@edamame-security
   ```
 - **edamame_openclaw** (OpenClaw): See [edamame_openclaw README](https://github.com/edamametechnologies/edamame_openclaw) for plugin bundle and Lima VM provisioning.
-| [edamame_security](https://github.com/edamametechnologies/edamame_security) | EDAMAME Security desktop/mobile app |
-| [edamame_posture](https://github.com/edamametechnologies/edamame_posture) | EDAMAME Posture CLI for CI/CD and servers |
-| [edamame_core_api](https://github.com/edamametechnologies/edamame_core_api) | EDAMAME Core public API documentation |
-| [threatmodels](https://github.com/edamametechnologies/threatmodels) | Public security benchmarks, policies, and threat models |
 
 ## License
 
