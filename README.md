@@ -161,6 +161,8 @@ The full cross-agent E2E harness (intent + CVE/divergence) lives in
 |------------|---------|
 | [edamame_openclaw](https://github.com/edamametechnologies/edamame_openclaw) | EDAMAME OpenClaw integration |
 | [edamame_claude_code](https://github.com/edamametechnologies/edamame_claude_code) | EDAMAME integration for Claude Code |
+| [edamame_claude_desktop](https://github.com/edamametechnologies/edamame_claude_desktop) | EDAMAME integration for Claude Desktop |
+| [edamame_codex](https://github.com/edamametechnologies/edamame_codex) | EDAMAME integration for Codex CLI |
 | [agent_security](https://github.com/edamametechnologies/agent_security) | Research paper: two-plane runtime security (arXiv preprint) |
 | [edamame_security](https://github.com/edamametechnologies/edamame_security) | EDAMAME Security desktop/mobile app |
 | [edamame_posture](https://github.com/edamametechnologies/edamame_posture) | EDAMAME Posture CLI for CI/CD and servers |
