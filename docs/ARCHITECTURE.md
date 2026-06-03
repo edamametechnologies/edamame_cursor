@@ -43,6 +43,37 @@ EDAMAME supports three additive reasoning-plane producer contracts:
 - Cursor workstation mode (this package): reads transcript artifacts, builds a `RawReasoningSessionPayload`, and calls `upsert_behavioral_model_from_raw_sessions` so EDAMAME can generate the `BehavioralWindow` internally with its configured LLM provider.
 - EDAMAME-side external transcript observer (added in core 1.2.3): runs inside `edamame_core` and reads `~/.cursor/projects/.../agent-transcripts/` directly, feeding the same ingest pipeline. The observer is the security primitive: divergence detection works as soon as Cursor is **discovered** on disk, regardless of whether this Node-side package is installed. When the package **is** installed, its bridge also pushes models in-process and the observer hash-skips on duplicate payloads -- so the two paths are purely additive and the install / MCP / pairing flow in this repo is unchanged. Operator UX (pause / resume / run-now) lives in the EDAMAME app's AI / Config tab. When the observer is paused while Cursor is discovered on disk, EDAMAME's `unsecured_cursor` internal threat trips on the next score cycle. See `../../edamame_core/AGENTIC.md` and `../../edamame_core/INTERNAL.md` in the workspace.
 
+## Observer vs plugin: the value boundary
+
+The two paths above are **not** peers, and conflating them in either
+direction is wrong: this package is neither the security control nor dead
+weight.
+
+| | EDAMAME host-side observer | This package (reasoning plane) |
+|---|---|---|
+| Role | **Security control of record** | **Cooperative enhancement** |
+| Trust model | Observer-independent: runs in the system plane, so a compromised Cursor cannot pause, blind, or silence it | Cooperative: Cursor voluntarily declares intent; it can only *add* signal, never *weaken* a verdict |
+| Needs | Cursor's transcripts readable on the host (Cursor **discovered** on disk) | Cursor itself running this MCP bridge |
+| Provides the guarantee? | **Yes** -- divergence detection works with zero plugin installed | **No** -- it adds coverage and convenience only |
+
+The package earns its place in two ways, neither of which is the
+guarantee itself:
+
+- **Off-host coverage.** When Cursor runs where the host observer cannot
+  read its transcripts -- a remote box, SSH session, container, CI runner,
+  VM, or a different user account -- this in-process bridge is the *only*
+  path that delivers the behavioral model to EDAMAME.
+- **Cooperative onboarding and UX.** MCP-native discovery, pairing, the
+  in-agent read-only posture/verdict surface, health checks, intent
+  export, and security-awareness rules and skills -- the turnkey ramp that
+  gets a workstation monitored and lets the developer see verdicts from
+  inside Cursor.
+
+Corollary: a security *decision* never moves into the package. Dismissing
+findings, clearing divergence state, or any verdict-mutating capability
+stays operator-only on the EDAMAME side (the MCP observer-independence
+policy). The package observes and onboards; it never adjudicates.
+
 ## Component Mapping
 
 | OpenClaw concept | Cursor package component | Responsibility |
