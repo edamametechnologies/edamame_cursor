@@ -2,9 +2,11 @@
 
 **Runtime behavioral monitoring for Cursor on developer workstations.**
 
-This package bridges Cursor transcripts (reasoning plane) to the
-[EDAMAME Security](https://edamame.tech) system-plane observer, enabling
-two-plane divergence detection on developer machines.
+EDAMAME Security monitors Cursor **automatically**: its host-side observer runs
+two-plane divergence detection against Cursor the moment Cursor is discovered on
+disk, with **no plugin required**. This package is a cooperative enhancement — it
+adds off-host coverage and turnkey MCP onboarding (see "Observer vs plugin" below),
+and never provides, or can weaken, that guarantee.
 
 This is a named Cursor integration for EDAMAME Security, not a separate
 EDAMAME product surface.
@@ -12,9 +14,12 @@ EDAMAME product surface.
 ## How It Works
 
 1. Cursor produces session transcripts while you code.
-2. This package parses transcripts and forwards them to EDAMAME via MCP.
+2. EDAMAME's host-side observer reads those transcripts directly (no plugin required)
+   and runs divergence detection. Where the host cannot read them (off-host / remote /
+   container), this package forwards them via MCP instead.
 3. EDAMAME evaluates behavioral intent against live system telemetry.
-4. Divergence verdicts surface through the control center or health checks.
+4. Divergence verdicts surface in EDAMAME (and, for convenience, through this package's
+   control center or health checks).
 
 ## Observer vs plugin: what provides the security
 
